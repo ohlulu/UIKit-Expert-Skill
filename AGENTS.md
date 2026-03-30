@@ -11,15 +11,7 @@ This document provides guidance for AI agents working with this skill to ensure 
 - Backend or server-side Swift patterns
 - Swift concurrency deep dives (use UIKit-specific async patterns only)
 
-### 2. No Code Formatting or Linting
-**Do not include formatting/linting rules.** Avoid:
-- Property ordering requirements
-- Code organization mandates
-- Whitespace or indentation rules
-- Naming convention enforcement
-- File structure requirements
-
-### 3. No Architectural Opinions
+### 2. No Architectural Opinions
 **Stick to facts, not architectures.** Avoid:
 - Enforcing MVVM, MVC, VIPER, or any specific architecture
 - Mandating coordinator patterns
@@ -28,7 +20,7 @@ This document provides guidance for AI agents working with this skill to ensure 
 
 **Exception**: Suggest separating business logic for testability without enforcing how.
 
-### 4. No Tool-Specific Instructions
+### 3. No Tool-Specific Instructions
 **Agents cannot use external tools.** Do not include:
 - Xcode Instruments profiling instructions
 - Debugging tool usage
@@ -61,10 +53,8 @@ This document provides guidance for AI agents working with this skill to ensure 
 
 ### ❌ Exclude These Topics:
 - Swift concurrency deep dives
-- Code formatting and style rules
 - Architectural patterns and mandates
 - Tool usage instructions
-- File organization requirements
 - Testing frameworks and patterns
 - Build system configuration
 - SwiftUI (except bridging)
@@ -82,6 +72,6 @@ If unsure, err on the side of excluding content.
 ## Summary
 
 **Focus**: UIKit APIs, patterns, and correctness
-**Avoid**: Formatting, architecture, tools, Swift language features
+**Avoid**: Architecture, tools, Swift language features
 **Tone**: Factual, helpful, non-prescriptive
 **Goal**: Make agents UIKit experts without enforcing opinions

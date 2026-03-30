@@ -29,7 +29,7 @@ Consult the reference file for each topic relevant to the current task:
 
 | Topic | Reference |
 |-------|-----------|
-<!-- Topics will be added as references are created -->
+| File structure (VC/View organization, extensions, layout placement) | [file-structure-patterns](references/file-structure-patterns.md) |
 
 ## Correctness Checklist
 
@@ -39,4 +39,4 @@ These are hard rules — violations are always bugs:
 
 ## References
 
-<!-- References will be listed here as they are created -->
+- [File Structure Patterns](references/file-structure-patterns.md) — ViewController/UIView file organization, extension separation, lazy var UI properties, access level ordering, layout placement
