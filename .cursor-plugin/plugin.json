@@ -1,0 +1,26 @@
+{
+  "name": "uikit-expert",
+  "version": "0.1.0",
+  "description": "Expert UIKit guidance for view lifecycle, Auto Layout, table/collection views, navigation, animation, and modern UIKit patterns.",
+  "author": {
+    "name": "ohlulu"
+  },
+  "repository": "https://github.com/ohlulu/UIKit-Pattern-Skill",
+  "license": "MIT",
+  "keywords": [
+    "swift",
+    "uikit",
+    "ios",
+    "apple",
+    "auto-layout",
+    "table-view",
+    "collection-view",
+    "navigation",
+    "animation",
+    "diffable-datasource",
+    "compositional-layout"
+  ],
+  "skills": [
+    "uikit-expert-skill"
+  ]
+}
