@@ -1,5 +1,5 @@
 # UIKit Expert Skill
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/ohlulu/UIKit-Pattern-Skill/blob/main/LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/ohlulu/UIKit-Expert-Skill/blob/main/LICENSE)
 
 Expert UIKit guidance for any AI coding tool that supports the [Agent Skills open format](https://agentskills.io/home) — view lifecycle, Auto Layout, table/collection views, navigation, animation, and modern UIKit patterns.
 
@@ -12,12 +12,12 @@ Expert UIKit guidance for any AI coding tool that supports the [Agent Skills ope
 
 ### Option A: Using skills.sh
 ```bash
-npx skills add https://github.com/ohlulu/UIKit-Pattern-Skill --skill uikit-expert-skill
+npx skills add https://github.com/ohlulu/UIKit-Expert-Skill --skill uikit-expert-skill
 ```
 
 ### Option B: Using pi package manager
 ```bash
-pi install https://github.com/ohlulu/UIKit-Pattern-Skill
+pi install https://github.com/ohlulu/UIKit-Expert-Skill
 ```
 
 ### Option C: Manual install
