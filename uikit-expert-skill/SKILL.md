@@ -30,7 +30,7 @@ Consult the reference file for each topic relevant to the current task:
 | Topic | Reference |
 |-------|-----------|
 | File structure (VC/View organization, extensions, layout placement) | [file-structure-patterns](references/file-structure-patterns.md) |
-| Animation (duration, curve, fade defaults) | [animation-patterns](references/animation-patterns.md) |
+| Animation (duration, curve, fade defaults) | [animation](references/animation.md) |
 
 ## Correctness Checklist
 
@@ -41,4 +41,4 @@ These are hard rules — violations are always bugs:
 ## References
 
 - [File Structure Patterns](references/file-structure-patterns.md) — ViewController/UIView file organization, extension separation, lazy var UI properties, access level ordering, layout placement
-- [Animation Patterns](references/animation-patterns.md) — Linear fade 0.1s default, transition durations, no spring unless requested
+- [Animation Patterns](references/animation.md) — Linear fade 0.1s default, transition durations, no spring unless requested
