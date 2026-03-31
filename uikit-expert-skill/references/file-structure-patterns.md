@@ -8,7 +8,7 @@ UIKit view controllers and views follow a consistent file structure that separat
 
 The main declaration contains only:
 1. **Protocol conformances** — all listed on the class declaration line
-2. **Properties** — ordered by access level: public → internal → private
+2. **Properties** — ordered by access level: public → internal → private. UI properties always use `lazy var` with a closure for inline configuration (see [UI Properties](#ui-properties)).
 3. **Lifecycle methods** — after all properties
 
 ```swift
