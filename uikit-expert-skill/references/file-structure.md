@@ -1,15 +1,33 @@
-# File Structure Patterns for UIViewController / UIView
+# File Structure Patterns
 
 ## Overview
 
-UIKit view controllers and views follow a consistent file structure that separates concerns into the main declaration and purpose-specific extensions. The main declaration answers "what is this object?", and extensions answer "what does it do?"
+All UIKit types — view controllers, views, cells, and other subclasses — follow a consistent file structure that separates concerns into the main declaration and purpose-specific extensions. The main declaration answers "what is this object?", and extensions answer "what does it do?"
 
 ## Main Declaration
 
 The main declaration contains only:
 1. **Protocol conformances** — all listed on the class declaration line
-2. **Properties** — ordered by access level: public → internal → private. UI properties use the simplest form that fits: direct initialization for one-line setup, `lazy var` with a closure only when inline configuration needs multiple statements (see [UI Properties](#ui-properties)).
+2. **Properties** — ordered by access level: public → internal → private. UI properties use the simplest form that fits (see [UI Properties](#ui-properties)).
 3. **Lifecycle methods** — after all properties
+
+## Extensions by Responsibility
+
+Everything outside properties and lifecycle goes into extensions, each with a single responsibility.
+
+### Protocol Conformance Extensions
+
+Each protocol gets its own extension. The conformance is declared on the class line — extensions only organize the implementation.
+
+### Action Handler Extension
+
+All `@objc` action methods live in a dedicated private extension.
+
+### Layout Extension (Always Last)
+
+Layout code is always the **last section** in the file. A single `private extension` contains `setupUI()`, which handles both view hierarchy assembly (`addSubview`) and constraint setup.
+
+## UIViewController
 
 ```swift
 class ProfileViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
@@ -40,17 +58,7 @@ class ProfileViewController: UIViewController, UITableViewDataSource, UITableVie
         viewModel.refresh()
     }
 }
-```
 
-## Extensions by Responsibility
-
-Everything outside properties and lifecycle goes into extensions, each with a single responsibility.
-
-### Protocol Conformance Extensions
-
-Each protocol gets its own extension. The conformance is already declared on the class line — extensions only organize the implementation.
-
-```swift
 // MARK: - UITableViewDataSource
 extension ProfileViewController {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -70,30 +78,14 @@ extension ProfileViewController {
         tableView.deselectRow(at: indexPath, animated: true)
     }
 }
-```
 
-### Action Handler Extension
-
-All `@objc` action methods live in a dedicated private extension, separate from layout and protocol conformances.
-
-```swift
 // MARK: - Actions
 private extension ProfileViewController {
     @objc func didTapSaveButton() {
         viewModel.save()
     }
-
-    @objc func didPullToRefresh() {
-        viewModel.refresh()
-    }
 }
-```
 
-### Layout Extension (Always Last)
-
-Layout code is always the **last section** in the file. A single `private extension` contains `setupUI()`, which handles both view hierarchy assembly (`addSubview`) and constraint setup.
-
-```swift
 // MARK: - Layout
 private extension ProfileViewController {
     func setupUI() {
@@ -112,6 +104,126 @@ private extension ProfileViewController {
             tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
+    }
+}
+```
+
+## UIView Subclass
+
+The same structure applies. Key differences:
+- Initializers (`init(frame:)` and `required init?(coder:)`) replace view controller lifecycle methods
+- `layoutSubviews` sits with initializers in the main declaration
+- Call `setupUI()` from the initializer
+
+```swift
+class AvatarView: UIView {
+
+    lazy var imageView: UIImageView = {
+        let imageView = UIImageView()
+        imageView.contentMode = .scaleAspectFill
+        imageView.clipsToBounds = true
+        return imageView
+    }()
+
+    private let badgeView = UIView()
+
+    // MARK: - Init
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setupUI()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupUI()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        imageView.layer.cornerRadius = imageView.bounds.width / 2
+    }
+}
+
+// MARK: - Layout
+private extension AvatarView {
+    func setupUI() {
+        addSubview(imageView)
+        addSubview(badgeView)
+
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        badgeView.translatesAutoresizingMaskIntoConstraints = false
+
+        NSLayoutConstraint.activate([
+            imageView.topAnchor.constraint(equalTo: topAnchor),
+            imageView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            imageView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            imageView.bottomAnchor.constraint(equalTo: bottomAnchor),
+
+            badgeView.widthAnchor.constraint(equalToConstant: 12),
+            badgeView.heightAnchor.constraint(equalToConstant: 12),
+            badgeView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            badgeView.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+    }
+}
+```
+
+## UITableViewCell / UICollectionViewCell
+
+Cells follow the same pattern. Key differences:
+- `contentView` is the layout root, not `self`
+- `prepareForReuse()` sits with lifecycle methods
+- Keep cell configuration minimal — the row/item controller or caller owns data binding
+
+```swift
+class AvatarCell: UITableViewCell {
+
+    lazy var avatarView: AvatarView = AvatarView()
+    lazy var nameLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 14)
+        return label
+    }()
+
+    // MARK: - Lifecycle
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        setupUI()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupUI()
+    }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        avatarView.imageView.image = nil
+        nameLabel.text = nil
+    }
+}
+
+// MARK: - Layout
+private extension AvatarCell {
+    func setupUI() {
+        contentView.addSubview(avatarView)
+        contentView.addSubview(nameLabel)
+
+        avatarView.translatesAutoresizingMaskIntoConstraints = false
+        nameLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        NSLayoutConstraint.activate([
+            avatarView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            avatarView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            avatarView.widthAnchor.constraint(equalToConstant: 48),
+            avatarView.heightAnchor.constraint(equalToConstant: 48),
+
+            nameLabel.leadingAnchor.constraint(equalTo: avatarView.trailingAnchor, constant: 12),
+            nameLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            nameLabel.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
         ])
     }
 }
@@ -155,11 +267,11 @@ Within any scope (main declaration or extension), order members by access level:
 
 ```
 ┌─────────────────────────────────────────┐
-│ class Foo: UIViewController, Protocols  │
+│ class Foo: SuperClass, Protocols        │
 │                                         │
 │   internal properties (direct init / lazy)│
 │   private properties                    │
-│   lifecycle methods                     │
+│   init / lifecycle methods              │
 │                                         │
 ├─────────────────────────────────────────┤
 │ extension Foo  // Protocol A methods    │
@@ -171,3 +283,5 @@ Within any scope (main declaration or extension), order members by access level:
 │ private extension Foo  // Layout (LAST) │
 └─────────────────────────────────────────┘
 ```
+
+This structure applies uniformly to `UIViewController`, `UIView`, `UITableViewCell`, `UICollectionViewCell`, and other UIKit subclasses. Type-specific lifecycle methods (`viewDidLoad`, `layoutSubviews`, `prepareForReuse`) sit in the lifecycle section of the main declaration.

@@ -1,26 +1,22 @@
 ---
 name: uikit-expert-skill
-description: Write, review, or improve UIKit code following best practices for view lifecycle, Auto Layout, table/collection views, navigation, animation, and modern UIKit patterns. Use when building new UIKit features, refactoring existing views, reviewing code quality, or modernizing legacy UIKit code.
+description: Write, review, or improve UIKit code following best practices for view lifecycle, table/collection views, animation, and UIKit testability. Use when building new UIKit features, refactoring existing views, reviewing code quality, or modernizing legacy UIKit code.
 ---
 
 # UIKit Expert Skill
 
-## Operating Rules
+## Precedence Rule
 
-- When writing or reviewing a **UIViewController or UIView** → read [file-structure.md](references/file-structure.md) first.
-- When writing or reviewing **any animation** (`UIView.animate`, transitions, alpha changes) → read [animation.md](references/animation.md) first.
-- When writing or reviewing a **complex table/collection list** (multiple cell types, diffable data source, prefetching, compositional layout, row/item controllers, or section controllers) → read [list-composition.md](references/list-composition.md) and [list-composition-shapes.md](references/list-composition-shapes.md) first. If the project has no stronger established local pattern, generate code using the defaults in `list-composition-shapes.md`.
-- When writing or reviewing **UIKit tests or UIKit testability hooks** (screen integration tests, acceptance tests, lifecycle simulation, interaction helpers, leak tracking, list visibility/reuse tests) → read [testing.md](references/testing.md) first.
-- Apply all rules from the matched references. Do not skip them for convenience.
+When a project already has an established convention that conflicts with guidance in this skill, ask the user which to follow. Do not silently override project conventions.
 
 ## Topic Router
 
-Consult the reference file for each topic relevant to the current task:
+Consult the reference file for each topic relevant to the current task. Apply all rules from the matched references — do not skip them for convenience.
 
 | Topic | Reference |
 |-------|-----------|
-| File structure (VC/View organization, extensions, layout placement) | [file-structure](references/file-structure.md) |
+| File structure (property ordering, extensions, layout placement for UIViewController, UIView, UITableViewCell, and other UIKit subclasses) | [file-structure](references/file-structure.md) |
 | Animation (duration, curve, fade defaults) | [animation](references/animation.md) |
-| List composition (heterogeneous cells, row/item controllers, section controllers, diffable, compositional layout) | [list-composition](references/list-composition.md) |
-| List composition shapes (default wrappers, containers, row/item/section ownership) | [list-composition-shapes](references/list-composition-shapes.md) |
-| Testing (UIKit integration tests, acceptance tests, lifecycle simulation, interaction helpers, leak tracking) | [testing](references/testing.md) |
+| List composition (heterogeneous cells, row/item controllers, section controllers, diffable, compositional layout, default shapes) | [list-composition](references/list-composition.md) |
+| Testing principles (test levels, async spies, assertion strategy, memory leak tracking) | [testing-principles](references/testing-principles.md) |
+| UIKit testing (lifecycle simulation, interaction helpers, reuse/visibility tests, screen integration tests) | [testing](references/testing.md) |

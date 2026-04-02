@@ -1,4 +1,4 @@
-# List Composition Patterns for UITableView / UICollectionView
+# List Composition Patterns
 
 ## Overview
 
@@ -11,8 +11,6 @@ Goal:
 - preserve stable identity during diffable updates
 
 For simple lists, prefer direct `UITableViewDiffableDataSource`, `UICollectionViewDiffableDataSource`, `CellRegistration`, or a focused view controller.
-
-For concrete default shapes used by this skill, also read [list-composition-shapes.md](list-composition-shapes.md).
 
 ## Decision Rule
 
@@ -33,7 +31,7 @@ For concrete default shapes used by this skill, also read [list-composition-shap
 
 ## Row / Item Controllers
 
-A row/item controller may own:
+A row/item controller owns:
 - cell creation and configuration
 - selection handling
 - `willDisplay` / `didEndDisplaying`
@@ -41,98 +39,221 @@ A row/item controller may own:
 - async request start / cancel
 - stable item identity
 
-### Guidance
-- Keep the list container responsible for snapshot application and callback forwarding.
-- Keep row-specific behavior in the row/item controller, not in a large screen-level switch.
-- Use a lightweight wrapper when needed to carry:
-  - stable identity
-  - cell data source object
-  - optional delegate hooks
-  - optional prefetch hooks
+### Default Row Wrapper (UITableView)
 
-## Reuse and Async Lifecycle
+```swift
+struct CellController: Hashable {
+    let id: AnyHashable
+    let dataSource: UITableViewDataSource
+    let delegate: UITableViewDelegate?
+    let prefetching: UITableViewDataSourcePrefetching?
 
-For rows that load images or other async resources:
-- reset visible state before starting a new request
-- cancel work in `didEndDisplaying`, `cancelPrefetchingForItemsAt`, or equivalent lifecycle callbacks
-- if the cell exposes a reuse callback, use it to release stale references or cancel work
-- never assume a previously captured cell still represents the same model after reuse
+    init(id: AnyHashable, _ dataSource: UITableViewDataSource) {
+        self.id = id
+        self.dataSource = dataSource
+        self.delegate = dataSource as? UITableViewDelegate
+        self.prefetching = dataSource as? UITableViewDataSourcePrefetching
+    }
+}
+```
 
-## Identity and Diffable
+### Default Item Wrapper (UICollectionView)
 
-Stable identity matters more than the abstraction itself.
+```swift
+struct CellController: Hashable {
+    let id: AnyHashable
+    let dataSource: UICollectionViewDataSource
+    let delegate: UICollectionViewDelegate
 
-- Use domain identity when the same logical item survives refreshes.
-- Avoid generating a new random ID on every update unless the row is intentionally transient.
-- Consider preserving an existing row/item controller when the same model remains on screen and the controller owns meaningful UI state or in-flight work.
+    init(id: AnyHashable, _ dataSource: UICollectionViewDataSource & UICollectionViewDelegate) {
+        self.id = id
+        self.dataSource = dataSource
+        self.delegate = dataSource
+    }
+}
+```
 
-## Incremental Pagination
+### Row Controller Skeleton
 
-A paginated UIKit list may be driven by a value that carries:
-- the current items
-- an optional next-page loader or continuation
+```swift
+final class AvatarRowController: NSObject, UITableViewDataSource, UITableViewDelegate, UITableViewDataSourcePrefetching {
+    private let model: AvatarViewModel
+    private weak var cell: AvatarCell?
 
-This idea is useful, but the exact type belongs to the app/shared layer rather than UIKit-specific guidance.
+    init(model: AvatarViewModel) {
+        self.model = model
+    }
 
-When generating UIKit code, depend only on the UI-facing behavior the screen needs:
-- current items to render
-- whether more content can be loaded
-- a way to request the next page
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { 1 }
 
-Do not prescribe a concrete app-level pagination type unless the project already has one.
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell: AvatarCell = tableView.dequeueReusableCell()
+        self.cell = cell
+        cell.nameLabel.text = model.name
+        return cell
+    }
+
+    func tableView(_ tableView: UITableView, didEndDisplaying cell: UITableViewCell, forRowAt indexPath: IndexPath) {
+        cancelWork()
+        self.cell = nil
+    }
+}
+```
+
+Hard rules:
+- one row controller per logical row type
+- store the model the row needs
+- release stale cell references on reuse / end-display
+- guard duplicate async starts in the controller or loader
 
 ## Section Controllers
 
-Section abstractions are optional. Use them only when a section owns real behavior beyond grouping rows/items.
+Section abstractions are optional. Add them only when a section owns real behavior beyond grouping rows/items.
 
-### UITableView sections
+### UITableView Sections
 
-Consider a section controller when a section owns:
+Generate a section controller only when the section owns:
 - header or footer view behavior
 - header or footer sizing rules
 - distinct row composition with clear semantic meaning
 
-Guidance:
-- keep the API narrow
-- prefer section-specific capabilities over exposing the full `UITableViewDelegate` surface
-- if a section only wraps an array of rows and adds no behavior, the abstraction may not be earning its keep
+Keep the API narrow. Do not expose the full `UITableViewDelegate` surface unless the project already uses that pattern consistently.
 
-### UICollectionView + compositional layout
+### UICollectionView + Compositional Layout
 
-Section controllers are more justified here.
-
-A collection section may reasonably own:
+Section controllers are more justified here. A collection section may own:
 - item controllers for that section
 - supplementary view creation
 - `NSCollectionLayoutSection` creation
 
-This fits the native compositional layout model.
+#### Default Section Wrapper
 
-If a layout concern is global to the whole collection view, keep that concern at the screen/container level instead of forcing one section to own global configuration.
+```swift
+protocol SectionControlling {
+    var cells: [CellController] { get }
+    func layoutSection(at section: Int, environment: NSCollectionLayoutEnvironment) -> NSCollectionLayoutSection
+    func supplementaryView(for collectionView: UICollectionView, kind: String, at indexPath: IndexPath) -> UICollectionReusableView?
+}
 
-## API Shape Guidance
+struct SectionController: Hashable {
+    let id: AnyHashable
+    let dataSource: SectionControlling
+}
+```
 
-When designing row/item/section abstractions:
-- prefer precise capabilities over oversized protocols
-- if many conformers return `nil` or implement no-op methods, the protocol is too broad
-- property-style access is often clearer than methods for stored outputs like `cells`
-- keep UIKit responsibilities aligned with UIKit boundaries:
-  - row/item behavior at item level
-  - section layout at section level
-  - snapshot orchestration at container level
+Generate this by default for compositional layout when sections differ meaningfully in layout, supplementary views, or item composition.
 
-## Good Signs
+## Containers
 
-The pattern is helping when:
-- the screen controller mostly forwards events instead of branching on cell type
-- async row work starts and stops in predictable lifecycle hooks
-- new cell types can be added without rewriting a large switch
-- section-specific layout or supplementary behavior stays near the section that owns it
+The container owns:
+- the table/collection view
+- diffable data source and snapshots
+- screen-level refresh / loading / error UI
+- callback forwarding to row/section objects
+
+Keep the container as a forwarding shell. Do not rebuild row behavior inside a large `switch indexPath`.
+
+### UITableView Container Skeleton
+
+```swift
+final class ListViewController: UITableViewController, UITableViewDataSourcePrefetching {
+    private var dataSource: UITableViewDiffableDataSource<Int, CellController>!
+
+    func display(_ sections: [CellController]...) {
+        var snapshot = NSDiffableDataSourceSnapshot<Int, CellController>()
+        sections.enumerated().forEach { section, cells in
+            snapshot.appendSections([section])
+            snapshot.appendItems(cells, toSection: section)
+        }
+        dataSource.apply(snapshot)
+    }
+
+    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        cellController(at: indexPath)?.delegate?.tableView?(tableView, didSelectRowAt: indexPath)
+    }
+
+    override func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
+        cellController(at: indexPath)?.delegate?.tableView?(tableView, willDisplay: cell, forRowAt: indexPath)
+    }
+
+    override func tableView(_ tableView: UITableView, didEndDisplaying cell: UITableViewCell, forRowAt indexPath: IndexPath) {
+        cellController(at: indexPath)?.delegate?.tableView?(tableView, didEndDisplaying: cell, forRowAt: indexPath)
+    }
+}
+```
+
+### UICollectionView Container Skeleton
+
+```swift
+final class ProductListViewController: UIViewController {
+    private lazy var dataSource = UICollectionViewDiffableDataSource<SectionController, CellController>(collectionView: collectionView) {
+        collectionView, indexPath, controller in
+        controller.dataSource.collectionView(collectionView, cellForItemAt: indexPath)
+    }
+
+    private func makeLayout() -> UICollectionViewLayout {
+        UICollectionViewCompositionalLayout { [weak self] sectionIndex, environment in
+            self?.dataSource.sectionIdentifier(for: sectionIndex)?
+                .dataSource
+                .layoutSection(at: sectionIndex, environment: environment)
+        }
+    }
+}
+```
+
+Hard rules:
+- keep global layout configuration at the screen/container level
+- do not move section-specific layout decisions back into a large screen-level switch once section controllers exist
+
+## Incremental Pagination
+
+UIKit code should depend only on:
+- current items
+- whether more content can be loaded
+- a way to request the next page
+
+Do not invent a new app-level pagination type inside UIKit-only code. If the project already has one, reuse it.
+
+### Load-More Row / Item
+
+For visible incremental pagination, generate a dedicated load-more row/item by default.
+
+Ownership:
+- the container decides whether the load-more row/item exists
+- the load-more row/item owns loading UI, error UI, retry UI, and next-page triggering
+
+Trigger priority:
+1. use `willDisplay` for simple end-of-list loading
+2. add retry interaction for failure states
+3. use prefetch or near-end detection only when earlier loading materially improves UX
+
+Rules:
+- guard duplicate requests
+- hide or remove the load-more row/item when no next page exists
+- do not generate a load-more row/item when pagination is invisible or unnecessary
+
+## Identity
+
+Generate stable identity by default.
+
+- Use domain identity when the same logical item survives refreshes.
+- Do not generate fresh random identifiers on every update unless the row is intentionally transient.
+- Preserve an existing controller for the same logical model when it owns meaningful UI state or in-flight work.
+
+## Async Lifecycle
+
+Generate lifecycle-aware async cleanup.
+
+- Reset visible state before starting a request.
+- Cancel work on end-display / cancel-prefetch / reuse boundaries.
+- Do not keep stale cell references after reuse.
+- Do not update a reused cell for an old model.
 
 ## Warning Signs
 
 The pattern is too heavy when:
-- most controllers are one-line wrappers with no behavior
+- most controllers are one-line pass-through wrappers with no behavior
 - the screen would be clearer with direct registrations and a small diffable data source
 - protocols expand just to satisfy a few advanced sections
 - trivial screens require jumping through many layers to debug basic behavior
+- the container still contains a large `switch indexPath`

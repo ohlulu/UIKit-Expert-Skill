@@ -28,7 +28,13 @@ pi install https://github.com/ohlulu/UIKit-Expert-Skill
 
 Reference files load on demand, so your agent gets deep guidance only for the topic at hand.
 
-<!-- Topics will be listed here as references are created -->
+| Reference | Coverage |
+|-----------|----------|
+| file-structure | Property ordering, extensions, layout placement for VC / View / Cell |
+| animation | Duration, curve, fade defaults |
+| list-composition | Row/item controllers, section controllers, diffable, compositional layout, default shapes |
+| testing-principles | Test levels, async spies, assertion strategy, memory leak tracking |
+| testing | UIKit lifecycle simulation, interaction helpers, reuse/visibility tests |
 
 Non-opinionated: focuses on correctness and performance, not architecture or code style.
 
@@ -38,12 +44,17 @@ Non-opinionated: focuses on correctness and performance, not architecture or cod
 uikit-expert-skill/
   SKILL.md
   references/
+    animation.md
+    file-structure.md
+    list-composition.md
+    testing-principles.md
+    testing.md
 ```
 <!-- END REFERENCE STRUCTURE -->
 
 ## Contributing
 
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+Contributions welcome — fix incorrect guidance, add modern APIs, expand reference coverage. Keep content UIKit-specific and non-opinionated.
 
 ## License
 
