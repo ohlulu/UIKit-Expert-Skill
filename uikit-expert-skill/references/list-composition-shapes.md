@@ -4,33 +4,25 @@
 
 When a UIKit list is complex enough to justify composition, and the project does not already define a stronger local pattern, generate code with these shapes by default.
 
-These are generation defaults for the skill:
-- use them as the starting point
-- deviate only when the project already has a clear, better-established local pattern
-- do not invent a new list abstraction without a concrete need
+Use this file as a generation guide, not as a pattern catalog.
+Keep the code close to these skeletons unless the project already has a clearer established shape.
 
-## Default Rule
+## Default Rules
 
 - For `UITableView`, default to row controllers first.
-- Add section controllers only when sections own real behavior.
+- Add table section controllers only when sections own real behavior.
 - For `UICollectionView` with compositional layout, default to section-aware composition.
-- For visible incremental pagination, default to a dedicated load-more row/item at the end of the list.
-- Keep the list container thin.
+- For visible incremental pagination, default to a dedicated load-more row/item.
+- Keep the container thin.
 - Keep identity stable.
 - Tie async work to UIKit lifecycle callbacks.
 
 ## Incremental Pagination Contract
 
-Do not generate a specific pagination value type as part of the UIKit skill default shape.
+Do not generate a specific pagination value type as part of the UIKit skill.
 
-A paginated screen may be driven by a value that carries:
+UIKit code should depend only on:
 - current items
-- an optional next-page loader or continuation
-
-This concept is useful, but the exact type belongs to the app/shared layer.
-
-When generating UIKit code, depend only on the UI-facing behavior the screen needs:
-- current items to render
 - whether more content can be loaded
 - a way to request the next page
 
@@ -42,41 +34,39 @@ Do not invent a new app-level pagination type inside UIKit-only code.
 For visible incremental pagination, generate a dedicated load-more row/item by default.
 
 Ownership:
-- the container decides whether the load-more row/item is present
+- the container decides whether the load-more row/item exists
 - the load-more row/item owns loading UI, error UI, retry UI, and next-page triggering
 
 Trigger priority:
 1. use `willDisplay` for simple end-of-list loading
 2. add retry interaction for failure states
-3. use prefetch or near-end detection only when earlier loading materially improves the experience
+3. use prefetch or near-end detection only when earlier loading materially improves UX
 
 Rules:
 - guard duplicate requests
-- remove or hide the load-more row/item when no next page exists
+- hide or remove the load-more row/item when no next page exists
 - do not generate a load-more row/item when pagination is invisible or unnecessary
 
 ## UITableView Default
 
 ### Ownership
 
-Generate table-based complex lists with this split:
-
 - **Container**
-  - owns the table view
-  - owns diffable data source and snapshot application
-  - owns screen-level refresh, loading, and error UI
-  - forwards table callbacks to row or section objects
+  - owns table view
+  - owns diffable data source and snapshots
+  - owns screen-level refresh / loading / error UI
+  - forwards callbacks to row or section objects
 - **Row controller**
   - owns cell configuration
-  - owns row selection
-  - owns row display lifecycle
-  - owns prefetch/cancel hooks when needed
+  - owns selection
+  - owns display lifecycle
+  - owns prefetch / cancel when needed
   - owns row-level async work
 - **Section controller**
   - optional
-  - add only when a section owns header/footer behavior or meaningful row composition
+  - add only for header/footer behavior or meaningful section-specific row composition
 
-### Default row wrapper
+### Canonical row wrapper
 
 ```swift
 struct CellController: Hashable {
@@ -94,13 +84,9 @@ struct CellController: Hashable {
 }
 ```
 
-Generate this wrapper by default when:
-- multiple row types exist
-- row lifecycle matters
-- row-specific async work exists
-- prefetching/cancellation exists
+Generate this by default for complex table lists.
 
-### Default container shape
+### Canonical container skeleton
 
 ```swift
 final class ListViewController: UITableViewController, UITableViewDataSourcePrefetching {
@@ -126,19 +112,13 @@ final class ListViewController: UITableViewController, UITableViewDataSourcePref
     override func tableView(_ tableView: UITableView, didEndDisplaying cell: UITableViewCell, forRowAt indexPath: IndexPath) {
         cellController(at: indexPath)?.delegate?.tableView?(tableView, didEndDisplaying: cell, forRowAt: indexPath)
     }
-
-    func tableView(_ tableView: UITableView, prefetchRowsAt indexPaths: [IndexPath]) {
-        indexPaths.forEach { indexPath in
-            cellController(at: indexPath)?.prefetching?.tableView(tableView, prefetchRowsAt: [indexPath])
-        }
-    }
 }
 ```
 
 Generate the container as a forwarding shell.
 Do not rebuild row behavior inside a large `switch indexPath`.
 
-### Default row controller shape
+### Canonical row controller skeleton
 
 ```swift
 final class AvatarRowController: NSObject, UITableViewDataSource, UITableViewDelegate, UITableViewDataSourcePrefetching {
@@ -162,38 +142,30 @@ final class AvatarRowController: NSObject, UITableViewDataSource, UITableViewDel
         cancelWork()
         self.cell = nil
     }
-
-    func tableView(_ tableView: UITableView, prefetchRowsAt indexPaths: [IndexPath]) {
-        startWorkIfNeeded()
-    }
 }
 ```
 
-Default behavior:
+Hard rules:
 - one row controller per logical row type
-- row controller stores the model it needs
-- row controller releases stale cell references on reuse/end-display
-- duplicate async starts must be guarded in the controller or loader
+- store the model the row needs
+- release stale cell references on reuse / end-display
+- guard duplicate async starts in the controller or loader
 
 ### Table section controllers
 
-Do not generate a section controller by default.
+Do not generate a table section controller by default.
 
 Generate one only when the section owns:
 - header/footer view behavior
 - header/footer sizing rules
-- section-specific row composition with clear semantic meaning
+- clear section-specific row composition
 
-When generating a table section controller:
-- keep the API narrow
-- prefer explicit section capabilities
-- do not expose the full `UITableViewDelegate` surface unless the project already uses that pattern consistently
+Keep the API narrow.
+Do not expose the full `UITableViewDelegate` surface unless the project already uses that pattern consistently.
 
 ## UICollectionView Default
 
 ### Ownership
-
-Generate collection-based complex lists with this split:
 
 - **Container**
   - owns collection view
@@ -202,14 +174,14 @@ Generate collection-based complex lists with this split:
   - owns collection-level configuration
 - **Item controller**
   - owns cell configuration
-  - owns item selection
+  - owns selection
   - owns item-level async work
 - **Section controller**
   - owns items for that section
   - may own supplementary creation
   - may own `NSCollectionLayoutSection`
 
-### Default item wrapper
+### Canonical item wrapper
 
 ```swift
 struct CellController: Hashable {
@@ -225,7 +197,7 @@ struct CellController: Hashable {
 }
 ```
 
-### Default section wrapper
+### Canonical section wrapper
 
 ```swift
 protocol SectionControllerDataSource {
@@ -240,12 +212,9 @@ struct SectionController: Hashable {
 }
 ```
 
-Generate this shape by default for compositional layout when sections differ meaningfully in:
-- layout
-- supplementary views
-- item composition
+Generate this by default for compositional layout when sections differ meaningfully in layout, supplementary views, or item composition.
 
-### Default container shape
+### Canonical container skeleton
 
 ```swift
 final class ProductListViewController: UIViewController {
@@ -264,20 +233,10 @@ final class ProductListViewController: UIViewController {
 }
 ```
 
-Generate the collection container as:
-- snapshot owner
-- layout owner
-- callback forwarder
-
-Do not move section-specific layout decisions back into a large screen-level switch if section controllers already exist.
-
-### Collection section-controller rule
-
-For compositional layout, section controllers are a valid default earlier than in table views.
-
-Still apply these limits:
+Hard rules:
+- keep the collection container as snapshot owner, layout owner, and callback forwarder
+- do not move section-specific layout decisions back into a large screen-level switch once section controllers exist
 - keep global layout configuration at the screen/container level unless the whole screen clearly derives from one section-level requirement
-- if many sections return `nil` or no-op supplementary methods, split the capability instead of widening the protocol further
 
 ## Identity Rule
 
@@ -285,11 +244,11 @@ Generate stable identity by default.
 
 - use domain identity when the same logical row/item survives updates
 - do not generate fresh random identifiers on every refresh unless the UI element is intentionally transient
-- when a controller owns meaningful state or in-flight work, prefer preserving the existing controller for the same logical model
+- preserve an existing controller for the same logical model when it owns meaningful UI state or in-flight work
 
 ## Async Lifecycle Rule
 
-Generate async row/item work with lifecycle-aware cleanup.
+Generate lifecycle-aware async cleanup.
 
 - reset visible state before starting a request
 - cancel work on end-display / cancel-prefetch / reuse boundaries
@@ -306,8 +265,8 @@ Generate async row/item work with lifecycle-aware cleanup.
 
 ## Failure Modes
 
-These are signs the generated abstraction is wrong:
-- most controllers are only pass-through wrappers
+The generated abstraction is wrong when:
+- most controllers are pass-through wrappers
 - protocols are broad and full of no-op conformers
 - trivial screens require tracing many layers
-- the container still contains a large `switch indexPath` despite the abstraction
+- the container still contains a large `switch indexPath`
