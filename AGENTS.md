@@ -65,14 +65,13 @@ Keep examples minimal:
 - Navigation patterns (push, present, custom transitions)
 - Animation and transition APIs
 - Performance patterns (cell reuse, image handling, off-screen rendering)
+- UIKit-specific testing and testability patterns
 - Accessibility best practices
 - Modern UIKit APIs and deprecations
 
 ### ❌ Exclude These Topics:
 - Swift concurrency deep dives
-- Architectural patterns and mandates
 - Tool usage instructions
-- Testing frameworks and patterns
 - Build system configuration
 - SwiftUI (except bridging)
 
