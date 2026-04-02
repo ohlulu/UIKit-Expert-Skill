@@ -38,6 +38,23 @@ This document provides guidance for AI agents working with this skill to ensure 
 - ✅ "Never force-unwrap IBOutlets in init"
 - ✅ "Always call super in lifecycle methods"
 
+### Examples
+
+Examples are **not required by default**. Add them only when they reduce ambiguity or correct a common AI failure mode.
+
+Use examples when a rule:
+- Has a boundary (`use A here, B there`)
+- Requires a specific output shape or ordering
+- Is easy for agents to misread or overgeneralize
+- Counters a common LLM habit
+
+Skip examples for obvious, binary rules.
+
+Keep examples minimal:
+- Prefer 1 positive example
+- Add 1 negative example only when contrast matters
+- Example should clarify the rule, not restate it at length
+
 ## What to Include
 
 ### ✅ Include These Topics:
