@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+
+- Relaxed UI property guidance: use direct initialization for one-line setup; reserve `lazy var` closures for multi-statement inline configuration.
+
 ## [0.1.0] — 2026-03-31
 
 - Added file structure patterns reference for ViewController / UIView organization (extension separation, access level ordering, lazy var UI properties, layout placement).

@@ -8,7 +8,7 @@ UIKit view controllers and views follow a consistent file structure that separat
 
 The main declaration contains only:
 1. **Protocol conformances** — all listed on the class declaration line
-2. **Properties** — ordered by access level: public → internal → private. UI properties always use `lazy var` with a closure for inline configuration (see [UI Properties](#ui-properties)).
+2. **Properties** — ordered by access level: public → internal → private. UI properties use the simplest form that fits: direct initialization for one-line setup, `lazy var` with a closure only when inline configuration needs multiple statements (see [UI Properties](#ui-properties)).
 3. **Lifecycle methods** — after all properties
 
 ```swift
@@ -119,7 +119,15 @@ private extension ProfileViewController {
 
 ## UI Properties
 
-UI properties use **`lazy var` with a closure** for inline configuration. Default access level is `internal`.
+UI properties should use the **simplest initializer form that keeps the code obvious**. Default access level is `internal`.
+
+Use direct initialization when a single expression is enough:
+
+```swift
+lazy var subtotalRow: SummaryRow = SummaryRow(label: L10n.tr("cashier.subtotal"))
+```
+
+Use **`lazy var` with a closure** only when inline configuration needs multiple statements:
 
 ```swift
 lazy var avatarImageView: UIImageView = {
@@ -149,7 +157,7 @@ Within any scope (main declaration or extension), order members by access level:
 ┌─────────────────────────────────────────┐
 │ class Foo: UIViewController, Protocols  │
 │                                         │
-│   internal properties (lazy var, etc.)  │
+│   internal properties (direct init / lazy)│
 │   private properties                    │
 │   lifecycle methods                     │
 │                                         │
