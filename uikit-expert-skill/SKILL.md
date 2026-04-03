@@ -1,13 +1,16 @@
 ---
 name: uikit-expert-skill
-description: Write, review, or improve UIKit code following best practices for view lifecycle, table/collection views, animation, and UIKit testability. Use when building new UIKit features, refactoring existing views, reviewing code quality, or modernizing legacy UIKit code.
+description: Write, review, or improve UIKit code following best practices for view lifecycle, Auto Layout, table/collection views, navigation, animation, and UIKit testability. Use when building new UIKit features, refactoring existing views, reviewing code quality, or modernizing legacy UIKit code.
 ---
 
 # UIKit Expert Skill
 
 ## Precedence Rule
 
-When a project already has an established convention that conflicts with guidance in this skill, ask the user which to follow. Do not silently override project conventions.
+When a project already has a clear, established local convention, follow it by default.
+
+Ask the user only when local conventions are ambiguous, conflicting, or likely harmful.
+Do not silently replace a strong project convention with this skill's defaults.
 
 ## Topic Router
 
