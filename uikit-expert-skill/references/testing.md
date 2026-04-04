@@ -60,6 +60,79 @@ Prefer helpers like:
 
 Avoid repeating raw index-path, control-event, and layout plumbing in every test.
 
+## List Composition Test Helpers
+
+Consider these shapes for list screens using `CellController` composition. Adapt names to the feature domain.
+
+```swift
+extension ListViewController {
+    func numberOfRenderedItems(in section: Int) -> Int {
+        tableView.numberOfSections > section ? tableView.numberOfRows(inSection: section) : 0
+    }
+
+    func itemView<T: UITableViewCell>(at row: Int, section: Int) -> T? {
+        guard numberOfRenderedItems(in: section) > row else { return nil }
+
+        let indexPath = IndexPath(row: row, section: section)
+        return tableView.dataSource?.tableView(tableView, cellForRowAt: indexPath) as? T
+    }
+
+    @discardableResult
+    func simulateItemVisible<T: UITableViewCell>(at row: Int, section: Int) -> T? {
+        let indexPath = IndexPath(row: row, section: section)
+        let view: T? = itemView(at: row, section: section)
+        view.map { tableView.delegate?.tableView?(tableView, willDisplay: $0, forRowAt: indexPath) }
+        return view
+    }
+
+    @discardableResult
+    func simulateItemNotVisible<T: UITableViewCell>(at row: Int, section: Int) -> T? {
+        let indexPath = IndexPath(row: row, section: section)
+        let view: T? = simulateItemVisible(at: row, section: section)
+        view.map { tableView.delegate?.tableView?(tableView, didEndDisplaying: $0, forRowAt: indexPath) }
+        return view
+    }
+
+    func simulateItemNearVisible(at row: Int, section: Int) {
+        tableView.prefetchDataSource?.tableView(tableView, prefetchRowsAt: [IndexPath(row: row, section: section)])
+    }
+
+    func simulateItemNotNearVisible(at row: Int, section: Int) {
+        let indexPath = IndexPath(row: row, section: section)
+        tableView.prefetchDataSource?.tableView?(tableView, cancelPrefetchingForRowsAt: [indexPath])
+    }
+}
+```
+
+For a visible load-more row, add a tiny helper layer instead of open-coding section/index-path details in each test.
+
+```swift
+extension ListViewController {
+    func simulateLoadMoreAction(section: Int = 1) {
+        guard let cell: LoadMoreCell = itemView(at: 0, section: section) else { return }
+
+        let indexPath = IndexPath(row: 0, section: section)
+        tableView.delegate?.tableView?(tableView, willDisplay: cell, forRowAt: indexPath)
+    }
+
+    func simulateTapOnLoadMoreError(section: Int = 1) {
+        tableView.delegate?.tableView?(tableView, didSelectRowAt: IndexPath(row: 0, section: section))
+    }
+
+    var isShowingLoadMoreIndicator: Bool {
+        loadMoreCell()?.isLoading == true
+    }
+
+    var loadMoreErrorMessage: String? {
+        loadMoreCell()?.message
+    }
+
+    private func loadMoreCell(section: Int = 1) -> LoadMoreCell? {
+        itemView(at: 0, section: section)
+    }
+}
+```
+
 ## Reuse, Visibility, and Cancellation
 
 For reusable list cells with async work, test these transitions explicitly:
@@ -81,6 +154,8 @@ Good examples:
 - expose computed properties for visible UI state in test helpers
 - replace platform-sensitive controls with fakes when needed
 
+If a real `UIRefreshControl` becomes hard to drive reliably on a given iOS version, consider swapping it with a tiny fake inside the test helper layer while preserving the existing target/action wiring.
+
 Keep these helpers tiny, focused on behavior observation/simulation, and out of production code when possible.
 
 ## UIKit-Specific Test Guidance
@@ -98,12 +173,15 @@ All sections below assume the default testing shape: real composer, lifecycle si
 
 ### Pagination
 
-Build through the real composer; simulate `willDisplay` for near-end items; assert rendered item count — not view-model properties.
+Build through the real composer; simulate `willDisplay` for the load-more row; assert rendered item count and visible load-more state — not view-model properties.
 
-- test whether load-more appears only when another page exists
-- test loading/error/retry behavior for the load-more row/item
-- test that load-more does not trigger duplicate requests
-- test that rendered item count equals one page on first appearance, then grows after simulating scroll near the end
+Verify this flow:
+1. simulate first appearance, complete the first page, assert rendered item count and whether a load-more row exists
+2. simulate the load-more row becoming visible, assert the next-page request and loading indicator
+3. complete load-more successfully, assert the combined rendered item count and that the loading indicator is hidden
+4. complete load-more with an error, assert the error message while previously rendered items stay visible
+5. simulate retry through tap or another visibility event, assert the error clears and duplicate requests are still prevented while loading
+6. complete the last page, assert the load-more row disappears
 
 ### Scene composition
 - test scene/window setup with a real `UIWindow` when possible
