@@ -6,6 +6,7 @@
 - Expanded list composition guidance with a concrete `CellController` identity shape, a fuller `ListViewController` forwarding skeleton, and prefetch forwarding.
 - Added visible load-more row guidance with `LoadMoreViewModel`, `LoadMoreCellController`, and a minimal `Paginated<Item>` seam for UIKit pagination consumption.
 - Expanded UIKit testing guidance with semantic list helpers, load-more test helpers, pagination integration test flow, and a note on fake refresh controls for deterministic tests.
+- Added composer guidance for storyboard-backed screen factories, dependency wiring, navigation closures, and scene root composition.
 
 ## [0.1.0] — 2026-03-31
 
