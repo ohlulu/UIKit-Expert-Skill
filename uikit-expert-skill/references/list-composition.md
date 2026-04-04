@@ -42,7 +42,7 @@ A row/item controller owns:
 ### Default Row Wrapper (UITableView)
 
 ```swift
-struct CellController: Hashable {
+struct CellController {
     let id: AnyHashable
     let dataSource: UITableViewDataSource
     let delegate: UITableViewDelegate?
@@ -55,12 +55,26 @@ struct CellController: Hashable {
         self.prefetching = dataSource as? UITableViewDataSourcePrefetching
     }
 }
+
+extension CellController: Equatable {
+    static func == (lhs: CellController, rhs: CellController) -> Bool {
+        lhs.id == rhs.id
+    }
+}
+
+extension CellController: Hashable {
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+}
 ```
+
+Derive equality and hashing from `id` only. The stored data source and delegate are behavior, not identity.
 
 ### Default Item Wrapper (UICollectionView)
 
 ```swift
-struct CellController: Hashable {
+struct CellController {
     let id: AnyHashable
     let dataSource: UICollectionViewDataSource
     let delegate: UICollectionViewDelegate
@@ -69,6 +83,18 @@ struct CellController: Hashable {
         self.id = id
         self.dataSource = dataSource
         self.delegate = dataSource
+    }
+}
+
+extension CellController: Equatable {
+    static func == (lhs: CellController, rhs: CellController) -> Bool {
+        lhs.id == rhs.id
+    }
+}
+
+extension CellController: Hashable {
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }
 ```
@@ -157,7 +183,10 @@ Keep the container as a forwarding shell. Do not rebuild row behavior inside a l
 
 ```swift
 final class ListViewController: UITableViewController, UITableViewDataSourcePrefetching {
-    private var dataSource: UITableViewDiffableDataSource<Int, CellController>!
+    private lazy var dataSource = UITableViewDiffableDataSource<Int, CellController>(tableView: tableView) {
+        tableView, indexPath, controller in
+        controller.dataSource.tableView(tableView, cellForRowAt: indexPath)
+    }
 
     func display(_ sections: [CellController]...) {
         var snapshot = NSDiffableDataSourceSnapshot<Int, CellController>()
@@ -179,8 +208,26 @@ final class ListViewController: UITableViewController, UITableViewDataSourcePref
     override func tableView(_ tableView: UITableView, didEndDisplaying cell: UITableViewCell, forRowAt indexPath: IndexPath) {
         cellController(at: indexPath)?.delegate?.tableView?(tableView, didEndDisplaying: cell, forRowAt: indexPath)
     }
+
+    func tableView(_ tableView: UITableView, prefetchRowsAt indexPaths: [IndexPath]) {
+        indexPaths.forEach { indexPath in
+            cellController(at: indexPath)?.prefetching?.tableView(tableView, prefetchRowsAt: [indexPath])
+        }
+    }
+
+    func tableView(_ tableView: UITableView, cancelPrefetchingForRowsAt indexPaths: [IndexPath]) {
+        indexPaths.forEach { indexPath in
+            cellController(at: indexPath)?.prefetching?.tableView?(tableView, cancelPrefetchingForRowsAt: [indexPath])
+        }
+    }
+
+    private func cellController(at indexPath: IndexPath) -> CellController? {
+        dataSource.itemIdentifier(for: indexPath)
+    }
 }
 ```
+
+Assign `tableView.dataSource = dataSource` and `tableView.prefetchDataSource = self` when configuring the table view.
 
 ### UICollectionView Container Skeleton
 
@@ -212,11 +259,20 @@ UIKit code should depend only on:
 - whether more content can be loaded
 - a way to request the next page
 
-Do not invent a new app-level pagination type inside UIKit-only code. If the project already has one, reuse it.
+If the project already has a pagination type, reuse it. When it does not, a minimal seam like this is enough for UIKit list code:
+
+```swift
+struct Paginated<Item> {
+    let items: [Item]
+    let loadMore: (() async throws -> Paginated<Item>)?
+}
+```
+
+A container can decide whether a load-more row exists from `loadMore != nil` while the actual pagination strategy stays outside UIKit. Map the current page to content `CellController`s, then append an optional load-more `CellController` when another page exists.
 
 ### Load-More Row / Item
 
-For visible incremental pagination, generate a dedicated load-more row/item by default.
+For visible incremental pagination, a dedicated load-more row/item is often the clearest starting point.
 
 Ownership:
 - the container decides whether the load-more row/item exists
@@ -227,9 +283,74 @@ Trigger priority:
 2. add retry interaction for failure states
 3. use prefetch or near-end detection only when earlier loading materially improves UX
 
+Consider this shape when the list needs a visible load-more row:
+
+```swift
+struct LoadMoreViewModel {
+    let isLoading: Bool
+    let message: String?
+
+    static let idle = Self(isLoading: false, message: nil)
+    static let loading = Self(isLoading: true, message: nil)
+
+    static func error(_ message: String) -> Self {
+        Self(isLoading: false, message: message)
+    }
+}
+
+final class LoadMoreCellController: NSObject, UITableViewDataSource, UITableViewDelegate {
+    private let cell = LoadMoreCell()
+    private let requestNextPage: () -> Void
+    private var isRequestInFlight = false
+    private var offsetObserver: NSKeyValueObservation?
+
+    init(requestNextPage: @escaping () -> Void) {
+        self.requestNextPage = requestNextPage
+    }
+
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { 1 }
+
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        cell.selectionStyle = .none
+        return cell
+    }
+
+    func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
+        reloadIfNeeded()
+        offsetObserver = tableView.observe(\.contentOffset, options: [.new]) { [weak self] tableView, _ in
+            guard tableView.isDragging else { return }
+            self?.reloadIfNeeded()
+        }
+    }
+
+    func tableView(_ tableView: UITableView, didEndDisplaying cell: UITableViewCell, forRowAt indexPath: IndexPath) {
+        offsetObserver = nil
+    }
+
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        reloadIfNeeded()
+    }
+
+    func display(_ viewModel: LoadMoreViewModel) {
+        cell.message = viewModel.message
+        cell.isLoading = viewModel.isLoading
+        isRequestInFlight = viewModel.isLoading
+    }
+
+    private func reloadIfNeeded() {
+        guard !isRequestInFlight else { return }
+        isRequestInFlight = true
+        requestNextPage()
+    }
+}
+```
+
+Use `didEndDisplaying` to release observers and stale references. Cancel the page request only when the feature semantics require it.
+
 Rules:
 - guard duplicate requests
 - hide or remove the load-more row/item when no next page exists
+- use `didEndDisplaying` to release observers or stale UI references
 - do not generate a load-more row/item when pagination is invisible or unnecessary
 
 ## Identity
