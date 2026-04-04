@@ -26,6 +26,9 @@ This document provides guidance for AI agents working with this skill to ensure 
 - Debugging tool usage
 - IDE-specific features
 
+### 4. Chinese for Discussion, English for File Content
+Use Chinese for all discussion, including deciding what skill content should say; use English only when writing or updating actual files.
+
 ## Content Guidelines
 
 ### Suggestions vs Requirements
