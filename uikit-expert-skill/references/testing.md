@@ -85,6 +85,8 @@ Keep these helpers tiny, focused on behavior observation/simulation, and out of 
 
 ## UIKit-Specific Test Guidance
 
+All sections below assume the default testing shape: real composer, lifecycle simulation, rendered-state assertions. They describe **what** to test, not a different **how**.
+
 ### Pull-to-refresh
 - test that refresh starts on first appearance if that is the feature behavior
 - test that user-initiated refresh does not start a duplicate request while one is already running
@@ -95,9 +97,13 @@ Keep these helpers tiny, focused on behavior observation/simulation, and out of 
 - do not over-mock navigation controllers when a real navigation stack is easy to use in tests
 
 ### Pagination
+
+Build through the real composer; simulate `willDisplay` for near-end items; assert rendered item count — not view-model properties.
+
 - test whether load-more appears only when another page exists
 - test loading/error/retry behavior for the load-more row/item
 - test that load-more does not trigger duplicate requests
+- test that rendered item count equals one page on first appearance, then grows after simulating scroll near the end
 
 ### Scene composition
 - test scene/window setup with a real `UIWindow` when possible
