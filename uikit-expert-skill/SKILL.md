@@ -21,6 +21,6 @@ Consult the reference file for each topic relevant to the current task. Apply al
 | File structure (property ordering, extensions, layout placement for UIViewController, UIView, UITableViewCell, and other UIKit subclasses) | [file-structure](references/file-structure.md) |
 | Animation (duration, curve, fade defaults) | [animation](references/animation.md) |
 | List composition (heterogeneous cells, row/item controllers, section controllers, load-more controller, pagination seam, diffable, compositional layout, default shapes) | [list-composition](references/list-composition.md) |
-| Screen composition / composer (storyboard or nib instantiation, dependency wiring, navigation closures, scene root composition) | [composer](references/composer.md) |
+| Screen composition / composer (programmatic controller instantiation, dependency wiring, navigation closures, scene root composition) | [composer](references/composer.md) |
 | Testing principles (test levels, async spies, assertion strategy, memory leak tracking) | [testing-principles](references/testing-principles.md) |
 | UIKit testing (lifecycle simulation, semantic list helpers, reuse/visibility tests, pagination integration tests, screen integration tests) | [testing](references/testing.md) |

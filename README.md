@@ -33,7 +33,7 @@ Reference files load on demand, so your agent gets deep guidance only for the to
 | file-structure | Property ordering, extensions, layout placement for VC / View / Cell |
 | animation | Duration, curve, fade defaults |
 | list-composition | Row/item controllers, section controllers, load-more controller, pagination seam, diffable, compositional layout, default shapes |
-| composer | Storyboard or nib instantiation, dependency wiring, navigation closures, scene root composition |
+| composer | Programmatic controller instantiation, dependency wiring, navigation closures, scene root composition |
 | testing-principles | Test levels, async spies, assertion strategy, memory leak tracking |
 | testing | UIKit lifecycle simulation, semantic list helpers, reuse/visibility tests, pagination integration tests |
 

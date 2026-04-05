@@ -7,6 +7,7 @@ Use a dedicated composer or factory when a UIKit screen needs more wiring than a
 Goal:
 - instantiate the screen in one place
 - keep `UIViewController` focused on rendering and user events
+- build the UI hierarchy inside the screen type in code
 - wire loaders, callbacks, and navigation handlers at the edge
 - return a ready-to-display controller
 - keep scene/root composition thin
@@ -14,7 +15,7 @@ Goal:
 ## Decision Rule
 
 ### Consider a composer when the screen has:
-- storyboard or nib loading plus dependency injection
+- programmatic UI setup plus dependency injection
 - two or more external collaborators
 - callback wiring such as `onRefresh`, retry, or selection
 - UI-specific adapters or row controllers to create
@@ -22,7 +23,7 @@ Goal:
 
 ### Prefer direct initialization when the screen has:
 - one simple dependency
-- no storyboard or nib
+- an initializer that already expresses the full setup clearly
 - no callback wiring
 - no scene/root setup beyond `UIViewController()` or `UINavigationController(rootViewController:)`
 
@@ -40,11 +41,12 @@ A composer typically does **not** own:
 - business rules
 - persistence or network policy
 - view rendering logic
+- building subviews or constraints itself
 - starting side effects during composition
 
 ## Screen Composer Skeleton
 
-Consider this shape when a UIKit screen is storyboard-backed and needs callback wiring.
+Consider this shape when a UIKit screen is code-built and needs callback wiring.
 
 ```swift
 @MainActor
@@ -69,9 +71,7 @@ public final class FeedUIComposer {
     }
 
     private static func makeFeedViewController(title: String) -> ListViewController {
-        let bundle = Bundle(for: ListViewController.self)
-        let storyboard = UIStoryboard(name: "Feed", bundle: bundle)
-        let controller = storyboard.instantiateInitialViewController() as! ListViewController
+        let controller = ListViewController()
         controller.title = title
         return controller
     }
@@ -80,31 +80,24 @@ public final class FeedUIComposer {
 
 `FeedLoaderAdapter` stands for the UI-specific bridge between controller callbacks and the injected loaders. The composer creates that bridge, but the bridge owns the loading flow.
 
+If the screen is a plain `UIViewController` subclass, initialize it directly and let that type build its hierarchy in `viewDidLoad()` or a dedicated `setupUI()` path.
+
 ## Navigation Wiring
 
 Selection-driven navigation is often easiest to compose as a closure injected into the screen.
 
-```swift
-@MainActor
-public static func feedComposedWith(
-    feedLoader: @escaping () async throws -> Paginated<FeedImage>,
-    imageLoader: @escaping (URL) async throws -> Data,
-    selection: @escaping (FeedImage) -> Void
-) -> ListViewController {
-    let controller = makeFeedViewController(title: "Feed")
-    let adapter = FeedLoaderAdapter(
-        controller: controller,
-        feedLoader: feedLoader,
-        imageLoader: imageLoader,
-        selection: selection
-    )
+In the sample above, `selection` is the navigation seam:
 
-    controller.onRefresh = adapter.loadResource
-    return controller
-}
+```swift
+let adapter = FeedLoaderAdapter(
+    controller: controller,
+    feedLoader: feedLoader,
+    imageLoader: imageLoader,
+    selection: selection
+)
 ```
 
-This keeps push/present decisions outside the view controller while still making the wiring explicit at composition time.
+The controller reports the user event. The injected closure decides whether that event pushes, presents, or does something else. This keeps navigation decisions outside the view controller while still making the wiring explicit at composition time.
 
 ## Scene Root Composition
 
@@ -143,7 +136,7 @@ The scene layer decides navigation structure. Each screen composer decides how i
 
 - Do not trigger loaders during composition. Wait for lifecycle or user action.
 - Avoid retain cycles when wiring closures back into navigation or loaders.
-- Keep storyboard or nib lookup private to the composer unless local convention says otherwise.
+- Keep view hierarchy creation inside the screen type; the composer should choose initializers and wiring, not assemble subviews.
 - Return a controller that is ready to display without more external mutation.
 
 ## Testability
@@ -160,4 +153,4 @@ The composition boundary is drifting when:
 - `SceneDelegate` manually wires row controllers or per-cell logic
 - a view controller fetches app dependencies directly
 - the composer starts rendering or mapping view models itself
-- the same storyboard lookup and callback wiring is duplicated across call sites
+- the same controller initialization and callback wiring is duplicated across call sites
