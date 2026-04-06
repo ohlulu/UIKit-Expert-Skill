@@ -1,3 +1,8 @@
+---
+summary: Tag-driven release flow — changelog → tag → push → GitHub Actions creates Release
+read_when: Publishing a new version, creating a release, or updating the changelog for release
+---
+
 # Releasing
 
 ## Flow
