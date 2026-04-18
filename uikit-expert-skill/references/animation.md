@@ -153,14 +153,215 @@ Expand is slower and playful (discovery). Collapse is faster and direct (dismiss
 - Never call `removeAllItems()` + re-add inside a toggle — that destroys views and can't be animated.
 - Use `setNeedsLayout()` after changing `isHidden` so the container recalculates.
 
+## Text Expand / Collapse (UILabel Height Animation)
+
+Animating a UILabel between a truncated state (e.g. 3 lines) and full content requires a different strategy from the subview-based expand/collapse above. `numberOfLines` changes cause **instant text reflow** — the content snaps to its new state before the frame animation starts, producing a visual disconnect.
+
+### The Problem with `numberOfLines`
+
+```swift
+// ❌ Not smooth — text reflows immediately, frame animates separately
+label.numberOfLines = 0  // text snaps to full content
+UIView.animate(withDuration: 0.35, ...) {
+    self.layoutIfNeeded()  // frame grows, but text already changed
+}
+```
+
+| Phase | What happens |
+|-------|-------------|
+| Frame 0 | `numberOfLines = 0` — label renders ALL text instantly |
+| Frame 0 | Old frame still at 3-line height — extra text overflows or is clipped |
+| Frame 1…N | Frame animates to new height — but text was already there |
+
+Expand looks like a "sliding reveal" (acceptable). Collapse looks broken — text snaps to 3 lines while the frame is still tall, leaving empty space that then shrinks.
+
+### Solution: Constraint-Driven Height with Clip Container
+
+Keep `numberOfLines = 0` at all times. Control visible height with a constraint on a clipping container. The text never reflows — only the visible area changes.
+
+```
+┌─ NoteRowView ─────────────────────────┐
+│  [bullet]  ┌─ labelContainer ───────┐ │
+│            │  clipsToBounds = true   │ │
+│            │  ┌─ contentLabel ────┐  │ │
+│            │  │ numberOfLines = 0 │  │ │
+│            │  │ (full text)       │  │ │
+│            │  └───────────────────┘  │ │
+│            │  ← height constraint → │ │
+│            └────────────────────────┘ │
+└───────────────────────────────────────┘
+```
+
+Setup:
+
+```swift
+// Label always renders full text
+contentLabel.numberOfLines = 0
+contentLabel.lineBreakMode = .byTruncatingTail
+
+// Container clips overflow during animation
+labelContainer.clipsToBounds = true
+
+// Label pinned to container, bottom at lowered priority
+contentLabel.topAnchor.constraint(equalTo: labelContainer.topAnchor),
+contentLabel.leadingAnchor.constraint(equalTo: labelContainer.leadingAnchor),
+contentLabel.trailingAnchor.constraint(equalTo: labelContainer.trailingAnchor),
+{
+    let c = contentLabel.bottomAnchor.constraint(equalTo: labelContainer.bottomAnchor)
+    c.priority = .defaultHigh  // yields to height constraint when active
+    return c
+}()
+```
+
+Height constraint:
+
+```swift
+private var collapsedHeightConstraint: NSLayoutConstraint?
+
+private var collapsedTextHeight: CGFloat {
+    let font = contentLabel.font ?? .systemFont(ofSize: 15)
+    return ceil(font.lineHeight * 3)  // 3 lines
+}
+
+private func ensureCollapsedConstraint() {
+    let maxHeight = collapsedTextHeight
+    if let existing = collapsedHeightConstraint {
+        existing.constant = maxHeight
+    } else {
+        let c = labelContainer.heightAnchor.constraint(
+            lessThanOrEqualToConstant: maxHeight
+        )
+        c.priority = .required
+        collapsedHeightConstraint = c
+    }
+}
+```
+
+### Expand: Deactivate Constraint → Spring Height
+
+```swift
+func applyExpanded() {
+    collapsedHeightConstraint?.isActive = false
+}
+
+// In parent cell:
+row.applyExpanded()
+UIView.animate(
+    withDuration: 0.4,
+    delay: 0,
+    usingSpringWithDamping: 0.85,
+    initialSpringVelocity: 0,
+    options: .curveEaseOut
+) {
+    self.layoutIfNeeded()
+    collectionView.collectionViewLayout.invalidateLayout()
+    collectionView.layoutIfNeeded()
+}
+```
+
+Result: frame grows smoothly, text is revealed line by line as the container expands. Feels like a sliding reveal.
+
+### Collapse: Activate Constraint → Spring Height
+
+```swift
+func applyCollapsed() {
+    ensureCollapsedConstraint()
+    collapsedHeightConstraint?.isActive = true
+}
+
+// In parent cell:
+row.applyCollapsed()
+UIView.animate(
+    withDuration: 0.3,
+    delay: 0,
+    usingSpringWithDamping: 0.9,
+    initialSpringVelocity: 0,
+    options: .curveEaseOut
+) {
+    self.layoutIfNeeded()
+    collectionView.collectionViewLayout.invalidateLayout()
+    collectionView.layoutIfNeeded()
+}
+```
+
+Result: frame shrinks smoothly, text is masked from bottom upward. No text reflow snap.
+
+### Why This Works
+
+| Aspect | `numberOfLines` toggle | Constraint + clip |
+|--------|----------------------|-------------------|
+| Text reflow | Instant snap — not animatable | Never happens — text always rendered |
+| Frame change | Animatable via `layoutIfNeeded` | Same |
+| Expand visual | Sliding reveal (ok) | Sliding reveal (same) |
+| Collapse visual | Text snaps → empty space → shrink (bad) | Smooth mask from bottom (good) |
+| Truncation "..." | Automatic from `numberOfLines` | Not shown (chevron indicates overflow instead) |
+
+### Overflow Detection for Text
+
+Use the same two-pass pattern from [overflow-detection](overflow-detection.md), adapted for text height:
+
+```swift
+override func layoutSubviews() {
+    super.layoutSubviews()
+    guard pendingOverflowCheck, labelContainer.bounds.width > 0 else { return }
+    pendingOverflowCheck = false
+
+    let fullHeight = textHeight(for: contentLabel)
+    let maxCollapsed = collapsedTextHeight
+    if fullHeight > maxCollapsed + 1 {
+        DispatchQueue.main.async { [weak self] in
+            self?.onOverflowDetected?()
+        }
+    }
+}
+
+private func textHeight(for label: UILabel) -> CGFloat {
+    guard let text = label.text, let font = label.font else { return 0 }
+    let width = label.bounds.width > 0 ? label.bounds.width : labelContainer.bounds.width
+    guard width > 0 else { return 0 }
+    return (text as NSString).boundingRect(
+        with: CGSize(width: width, height: .greatestFiniteMagnitude),
+        options: .usesLineFragmentOrigin,
+        attributes: [.font: font],
+        context: nil
+    ).height
+}
+```
+
+### Anti-Patterns
+
+#### ❌ `performBatchUpdates(nil)` for Height Animation
+
+```swift
+// ❌ Causes visual glitches — the collection view recalculates cell
+// sizes in its own animation context which conflicts with the
+// constraint-driven height change
+row.animateExpand()
+collectionView.performBatchUpdates(nil)
+```
+
+Use `invalidateLayout()` + `layoutIfNeeded()` inside `UIView.animate` instead. This keeps the constraint change and the collection view layout in the same animation transaction.
+
+#### ❌ Toggling `numberOfLines` for Animated Height Changes
+
+```swift
+// ❌ Text reflows instantly — frame and content are out of sync
+label.numberOfLines = isExpanded ? 0 : 3
+UIView.animate { self.layoutIfNeeded() }
+```
+
+Use a height constraint on a clipping container instead (see above).
+
 ## Summary
 
 | Scenario | Duration | Curve |
 |----------|----------|-------|
 | Alpha fade (show/hide) | 0.1s | `.curveLinear` |
 | Transitions (push, present, layout) | Case-dependent | `.curveLinear` |
-| Expand height | 0.4s | Spring (damping 0.85) |
+| Expand height (subview-based) | 0.4s | Spring (damping 0.85) |
 | Expand content (stagger) | 0.3s each, 0.04s gap | Spring (damping 0.8) |
-| Collapse content | 0.15s | `.curveEaseIn` |
-| Collapse height | 0.3s | Spring (damping 0.9) |
+| Collapse content (subview-based) | 0.15s | `.curveEaseIn` |
+| Collapse height (subview-based) | 0.3s | Spring (damping 0.9) |
+| Text expand (constraint + clip) | 0.4s | Spring (damping 0.85) |
+| Text collapse (constraint + clip) | 0.3s | Spring (damping 0.9) |
 | Spring | Only when explicitly requested | Spring |
