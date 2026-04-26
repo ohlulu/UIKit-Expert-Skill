@@ -352,12 +352,152 @@ UIView.animate { self.layoutIfNeeded() }
 
 Use a height constraint on a clipping container instead (see above).
 
+## Staggered Entrance Animation (Collection View Cells)
+
+Cards fly in one by one when a screen first appears — each cell slides from off-screen with a per-item stagger delay, then reveals inner content in a cascade.
+
+### Architecture: `willDisplay` + `Task.sleep`
+
+Use `collectionView(_:willDisplay:forItemAt:)` to trigger per-cell entrance. This is the most robust hook — it fires exactly when each cell is about to appear, requires no `layoutIfNeeded()` hack, and doesn't depend on `visibleCells` (which is empty before layout).
+
+```swift
+// ViewController
+private var entranceAnimatedItems: Set<Int> = []
+private var isEntranceComplete = false
+private var entranceBaseDelay: TimeInterval = 0.35
+
+override func viewWillAppear(_ animated: Bool) {
+    super.viewWillAppear(animated)
+    // Capture actual push transition duration
+    if let d = transitionCoordinator?.transitionDuration, d > 0 {
+        entranceBaseDelay = d
+    }
+}
+
+override func viewDidAppear(_ animated: Bool) {
+    super.viewDidAppear(animated)
+    isEntranceComplete = true  // Stop future entrance animations
+}
+
+func collectionView(
+    _ collectionView: UICollectionView,
+    willDisplay cell: UICollectionViewCell,
+    forItemAt indexPath: IndexPath
+) {
+    guard !isEntranceComplete,
+          let cell = cell as? MyCell,
+          !entranceAnimatedItems.contains(indexPath.item) else { return }
+
+    entranceAnimatedItems.insert(indexPath.item)
+    cell.prepareForEntrance()
+    cell.animateEntrance(
+        delay: entranceBaseDelay + Double(indexPath.item) * 0.1
+    )
+}
+```
+
+### Cell Implementation
+
+```swift
+// Cell
+func prepareForEntrance() {
+    card.transform = CGAffineTransform(
+        translationX: -UIScreen.main.bounds.width, y: 0
+    )
+    card.alpha = 0.3
+    // Hide inner content — will fade in after card lands
+    [swatch1, swatch2, swatch3].forEach { $0.alpha = 0 }
+    nameLabel.alpha = 0
+}
+
+func animateEntrance(delay: TimeInterval) {
+    Task { @MainActor [weak self] in
+        if delay > 0 {
+            try? await Task.sleep(for: .seconds(delay))
+        }
+        guard let self else { return }
+
+        // Phase 1: card slides in
+        UIView.animate(
+            withDuration: 0.4, delay: 0,
+            usingSpringWithDamping: 0.82,
+            initialSpringVelocity: 0.3,
+            options: .curveEaseOut
+        ) {
+            self.card.transform = .identity
+            self.card.alpha = 1
+        } completion: { _ in
+            // Phase 2: inner content cascades in
+            let swatches = [self.swatch1, self.swatch2, self.swatch3]
+            for (i, v) in swatches.enumerated() {
+                UIView.animate(
+                    withDuration: 0.18,
+                    delay: Double(i) * 0.07,
+                    options: .curveEaseOut
+                ) { v.alpha = 1 }
+            }
+            UIView.animate(
+                withDuration: 0.2, delay: 0.21,
+                options: .curveEaseOut
+            ) { self.nameLabel.alpha = 1 }
+        }
+    }
+}
+```
+
+### ⚠️ Critical: Never Use `UIView.animate(delay:)` for Stagger Delays
+
+`UIView.animate(withDuration:delay:)` **immediately sets model-layer values to the final state**. During the delay period, the presentation layer shows the model value (the final position), not the prepared state. The view appears at its destination instantly — the slide-in becomes invisible.
+
+```swift
+// ❌ Card appears at final position during delay — slide-in invisible
+func animateEntrance(delay: TimeInterval) {
+    UIView.animate(withDuration: 0.4, delay: delay, ...) {
+        self.card.transform = .identity  // model layer set NOW
+    }
+}
+
+// ✅ Task.sleep preserves model layer at prepared state until animation starts
+func animateEntrance(delay: TimeInterval) {
+    Task { @MainActor in
+        try? await Task.sleep(for: .seconds(delay))
+        UIView.animate(withDuration: 0.4, delay: 0, ...) {
+            self.card.transform = .identity
+        }
+    }
+}
+```
+
+This applies to **any** animation where the view must remain in a non-default state during a delay (off-screen position, scaled down, rotated). Short delays (<0.1s) may be unnoticeable; longer delays make the artifact obvious.
+
+### Why Not Other Lifecycle Hooks?
+
+| Hook | `visibleCells` | Issue |
+|------|---------------|-------|
+| `viewDidLoad` | Empty | Layout hasn't run; cells don't exist |
+| `viewWillAppear` | Empty | Same — even with `layoutIfNeeded()` it's a hack |
+| `viewDidAppear` | ✅ Available | Works but fires after push ends — feels late |
+| `willDisplay` | N/A (per-cell) | ✅ Best — fires exactly when each cell appears |
+
+`willDisplay` + `transitionCoordinator.transitionDuration` as base delay = animation starts right when the push transition ends, no lifecycle timing hacks.
+
+### Timing Reference
+
+| Element | Value |
+|---------|-------|
+| Base delay | `transitionCoordinator.transitionDuration` (~0.35s) |
+| Per-item stagger | 0.1s |
+| Card slide-in | 0.4s spring (damping 0.82, velocity 0.3) |
+| Inner content cascade | 0.18s per element, 0.07s gap |
+| Text fade-in | 0.2s, starts 0.21s after card lands |
+
 ## Summary
 
 | Scenario | Duration | Curve |
 |----------|----------|-------|
 | Alpha fade (show/hide) | 0.1s | `.curveLinear` |
 | Transitions (push, present, layout) | Case-dependent | `.curveLinear` |
+| Staggered entrance (collection cells) | 0.4s slide + cascade | Spring (damping 0.82) |
 | Expand height (subview-based) | 0.4s | Spring (damping 0.85) |
 | Expand content (stagger) | 0.3s each, 0.04s gap | Spring (damping 0.8) |
 | Collapse content (subview-based) | 0.15s | `.curveEaseIn` |
