@@ -77,6 +77,56 @@ container.addSubview(content)
 
 This pattern applies to: app icon with shadow, card views, avatar images, any rounded element that also needs elevation.
 
+## CALayer Frame Ownership — Each View Manages Its Own Layers
+
+When adding `CAGradientLayer`, `CAShapeLayer`, or other sublayers to a view, **the owning view must update the layer's frame in its own `layoutSubviews`** — not a parent or grandparent.
+
+### The bug
+
+A cell's `layoutSubviews` reads a deeply nested subview's bounds and sets a sublayer frame:
+
+```swift
+// ❌ Cell's layoutSubviews — clipView is 3+ levels deep
+override func layoutSubviews() {
+    super.layoutSubviews()
+    gradientLayer.frame = clipView.bounds  // zero on first display!
+}
+```
+
+`super.layoutSubviews()` resolves constraints for the cell's direct subviews, but **deeply nested views may not have their bounds resolved yet**. The layer frame is set to `.zero`, and the gradient is invisible. Navigating away and back "fixes" it because the cell is reused with pre-existing bounds.
+
+This is especially deceptive: the second display always works, making the bug appear intermittent or timing-related.
+
+### The fix
+
+Create a UIView subclass that owns the layer and updates it in its own `layoutSubviews`:
+
+```swift
+// ✅ Each view manages its own layers
+private final class GradientBackgroundView: UIView {
+    let gradientLayer = CAGradientLayer()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        layer.addSublayer(gradientLayer)
+        // Set constant properties here (colors, startPoint, etc.)
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        gradientLayer.frame = bounds  // always correct — this view's own bounds
+    }
+}
+```
+
+When Auto Layout sets this view's frame, its `layoutSubviews` fires and the layer frame is immediately correct — regardless of how deep it sits in the hierarchy.
+
+### Rule of thumb
+
+- **Constant layer properties** (colors, startPoint, endPoint, cornerRadius): set in `init` or a `configure` method.
+- **Frame-dependent properties** (frame, path, shadowPath): set in the **owning view's** `layoutSubviews`.
+- **Never reach down** from a parent's `layoutSubviews` to read a child's bounds for layer sizing.
+
 ## Diagnostic Checklist
 
 | Symptom | Likely cause |
@@ -85,3 +135,4 @@ This pattern applies to: app icon with shadow, card views, avatar images, any ro
 | Both shadow and background invisible | `backgroundColor` never set (deferred theme not called) |
 | Shadow visible on sides but clipped at bottom | Insufficient bottom margin for shadow extent |
 | Shadow flickers during scroll | Shadow is recalculated per frame — set `shadowPath` for performance |
+| Gradient/shape layer invisible on first display, appears after navigate-back | Layer frame set from a parent's `layoutSubviews` reading a deep child's bounds (still zero). Move layer to a subclass that manages it in its own `layoutSubviews` |
