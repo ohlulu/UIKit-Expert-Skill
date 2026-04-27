@@ -491,6 +491,39 @@ This applies to **any** animation where the view must remain in a non-default st
 | Inner content cascade | 0.18s per element, 0.07s gap |
 | Text fade-in | 0.2s, starts 0.21s after card lands |
 
+## Transform-Safe Positioning
+
+When a view may receive a `CGAffineTransform` (scale, rotate, translate), its parent **must not** use `frame` to position it. `frame` is a derived property computed from `bounds` + `center` + `transform`. Setting `frame` on a view with a non-identity transform produces undefined results — UIKit reverse-computes bounds/center and the values drift.
+
+This bites hardest when a layout pass fires during an animated transform (scroll, intrinsic content size invalidation, device rotation).
+
+```swift
+// ❌ frame + transform = drift
+override func layoutSubviews() {
+    super.layoutSubviews()
+    for (subview, size, origin) in items {
+        subview.frame = CGRect(origin: origin, size: size)
+        // If subview.transform != .identity → bounds/center are wrong
+    }
+}
+
+// ✅ bounds + center are independent of transform
+override func layoutSubviews() {
+    super.layoutSubviews()
+    for (subview, size, origin) in items {
+        subview.bounds = CGRect(origin: .zero, size: size)
+        subview.center = CGPoint(
+            x: origin.x + size.width / 2,
+            y: origin.y + size.height / 2
+        )
+    }
+}
+```
+
+**Rule**: Any custom layout container whose children may use transforms (press animations, entrance animations, drag-to-reorder) → always position with `bounds` + `center`, never `frame`.
+
+Auto Layout is immune — it sets `bounds` and `center` internally.
+
 ## Summary
 
 | Scenario | Duration | Curve |
