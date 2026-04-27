@@ -153,6 +153,140 @@ Expand is slower and playful (discovery). Collapse is faster and direct (dismiss
 - Never call `removeAllItems()` + re-add inside a toggle — that destroys views and can't be animated.
 - Use `setNeedsLayout()` after changing `isHidden` so the container recalculates.
 
+## Animating Height in Custom Layout Views
+
+`UIStackView` handles `isHidden` animation on arranged subviews automatically — the stack animates the height transition when `isHidden` is set inside a `UIView.animate` block.
+
+Custom layout views (e.g. a flow/tag-cloud layout that positions subviews in `layoutSubviews`) do **not** get this for free. Four pitfalls arise:
+
+### Pitfall 1: `isHidden` Is Not Animatable
+
+`isHidden` takes effect immediately, even inside an animation block. For UIStackView, Apple intercepts this and converts it to a height animation. Custom views get no such magic — the layout change happens instantly.
+
+```swift
+// ✅ UIStackView — height animates
+UIView.animate(withDuration: 0.3) {
+    self.childStack.isHidden = false  // stack animates height
+    self.scrollView.layoutIfNeeded()
+}
+
+// ❌ Custom layout — height jumps
+UIView.animate(withDuration: 0.3) {
+    self.altView.isHidden = false     // layout recalcs instantly
+    self.scrollView.layoutIfNeeded()
+}
+```
+
+### Pitfall 2: `invalidateIntrinsicContentSize()` Causes Deferred Layout
+
+Custom layout views often call `invalidateIntrinsicContentSize()` inside `layoutSubviews` when the computed height changes. This schedules a **second** Auto Layout pass that runs **after** the animation block, causing the parent container to jump in height.
+
+```swift
+// Inside custom layout view:
+override func layoutSubviews() {
+    super.layoutSubviews()
+    let newHeight = computeHeight()
+    // ❌ This triggers a deferred pass outside the animation block
+    if abs(bounds.height - newHeight) > 1 {
+        invalidateIntrinsicContentSize()
+    }
+}
+```
+
+### Solution: Precompute + Separate Concerns
+
+Split the two concerns:
+1. **Before** animation: compute the target height and notify Auto Layout.
+2. **Inside** animation: `layoutIfNeeded()` — Auto Layout uses the pre-computed size to resize the container (animated), then `layoutSubviews()` repositions child views (also animated).
+
+```swift
+// Add to custom layout view:
+private var cachedHeight: CGFloat?
+
+func precomputeIntrinsicHeight() {
+    guard bounds.width > 0 else { return }
+    let newHeight = computeHeight(for: bounds.width)
+    guard cachedHeight != newHeight else { return }
+    cachedHeight = newHeight
+    invalidateIntrinsicContentSize()
+}
+
+override var intrinsicContentSize: CGSize {
+    if let cached = cachedHeight {
+        return CGSize(width: UIView.noIntrinsicMetric, height: cached)
+    }
+    return CGSize(width: UIView.noIntrinsicMetric,
+                  height: computeHeight(for: bounds.width))
+}
+```
+
+Animation call site:
+
+```swift
+// 1. Change visibility
+for view in altViews { view.isHidden = false; view.alpha = 0 }
+
+// 2. Pre-compute target height (notifies Auto Layout)
+flowView.precomputeIntrinsicHeight()
+flowView.setNeedsLayout()  // ensure repositioning runs
+
+// 3. Animate — one block handles both card height + subview repositioning
+UIView.animate(withDuration: 0.4, delay: 0,
+               usingSpringWithDamping: 0.85, initialSpringVelocity: 0,
+               options: .curveEaseOut) {
+    self.findScrollAncestor()?.layoutIfNeeded()
+}
+```
+
+Why `arrangeItems()` won't re-invalidate: when `layoutIfNeeded()` runs, Auto Layout first updates the view's bounds to match the cached intrinsic size, **then** triggers `layoutSubviews()`. By the time `arrangeItems()` checks `bounds.height` vs computed height, they match — no re-invalidation.
+
+### Pitfall 3: `layoutIfNeeded()` Target Scope
+
+Calling `superview?.superview?.layoutIfNeeded()` is fragile — the view hierarchy depth can change. Always walk up to the nearest `UIScrollView`:
+
+```swift
+private func findScrollAncestor() -> UIScrollView? {
+    var current: UIView? = superview
+    while let view = current {
+        if let scroll = view as? UIScrollView { return scroll }
+        current = view.superview
+    }
+    return nil
+}
+```
+
+The scroll view is the natural animation boundary — it contains the full layout tree that needs to update (cards, stacks, rows).
+
+### Pitfall 4: `setNeedsLayout()` Required Even When Height Unchanged
+
+When expand/collapse doesn't change the number of lines (e.g. all content fits on one line), `precomputeIntrinsicHeight()` sees no height change and skips `invalidateIntrinsicContentSize()`. Without `setNeedsLayout()`, `arrangeItems()` never runs and subviews stay at their old positions.
+
+```swift
+// ❌ Primary value stuck at expanded position after single-line collapse
+flowView.precomputeIntrinsicHeight()  // same height → skips invalidate
+// No layout pass → arrangeItems never runs
+
+// ✅ Always mark for layout
+flowView.precomputeIntrinsicHeight()
+flowView.setNeedsLayout()  // arrangeItems will reposition subviews
+```
+
+### Decision Tree
+
+```
+Animating height change in a container?
+├─ UIStackView arranged subview?
+│  └─ Set isHidden inside animation block → auto-animated ✓
+│
+└─ Custom layout view (FlowLayout, manual frames)?
+   ├─ 1. Change isHidden outside animation block
+   ├─ 2. Call precomputeIntrinsicHeight() → caches target size
+   ├─ 3. Call setNeedsLayout() → ensures repositioning
+   └─ 4. Animation block: scrollAncestor.layoutIfNeeded()
+```
+
+---
+
 ## Text Expand / Collapse (UILabel Height Animation)
 
 Animating a UILabel between a truncated state (e.g. 3 lines) and full content requires a different strategy from the subview-based expand/collapse above. `numberOfLines` changes cause **instant text reflow** — the content snaps to its new state before the frame animation starts, producing a visual disconnect.
