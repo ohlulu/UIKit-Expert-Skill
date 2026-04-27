@@ -52,6 +52,31 @@ Always either:
 
 For reusable cells, also call `applyTheme()` at the end of `configure(with:)` to cover the reconfiguration path.
 
+## Shadow + Corner Radius: Parent/Child Split
+
+When a view needs **both** a shadow and rounded corners, they cannot coexist on the same layer. `clipsToBounds = true` (required for corner radius) clips the shadow. `clipsToBounds = false` (required for shadow) disables corner radius clipping.
+
+**Solution: two layers.**
+
+```swift
+// Parent: owns the shadow, does NOT clip
+let container = UIView()
+container.clipsToBounds = false
+container.layer.shadowColor = UIColor.black.cgColor
+container.layer.shadowOpacity = 0.2
+container.layer.shadowOffset = CGSize(width: 0, height: 4)
+container.layer.shadowRadius = 8
+
+// Child: owns the corner radius, DOES clip
+let content = UIImageView(image: icon)
+content.layer.cornerRadius = 16
+content.clipsToBounds = true
+container.addSubview(content)
+// Pin content edges to container edges
+```
+
+This pattern applies to: app icon with shadow, card views, avatar images, any rounded element that also needs elevation.
+
 ## Diagnostic Checklist
 
 | Symptom | Likely cause |
