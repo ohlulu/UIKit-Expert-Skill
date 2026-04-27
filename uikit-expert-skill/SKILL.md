@@ -1,6 +1,12 @@
 ---
 name: uikit-expert-skill
-description: Write, review, or improve UIKit code following best practices for view lifecycle, Auto Layout, table/collection views, navigation, animation, and UIKit testability. Use when building new UIKit features, refactoring existing views, reviewing code quality, or modernizing legacy UIKit code.
+description: >-
+  UIKit best practices for view lifecycle, Auto Layout, table/collection views,
+  navigation, animation, and testability. Load whenever working in a UIKit
+  codebase — building features, fixing bugs, debugging layout issues, implementing
+  designs or mockups, adjusting animations, resolving visual glitches, writing
+  tests, or doing SDD/Ralph tasks that produce UIKit code. If the project uses
+  UIKit and you will read or edit .swift view/controller files, load this skill.
 ---
 
 # UIKit Expert Skill
