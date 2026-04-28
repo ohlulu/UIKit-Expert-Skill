@@ -127,6 +127,52 @@ When Auto Layout sets this view's frame, its `layoutSubviews` fires and the laye
 - **Frame-dependent properties** (frame, path, shadowPath): set in the **owning view's** `layoutSubviews`.
 - **Never reach down** from a parent's `layoutSubviews` to read a child's bounds for layer sizing.
 
+## Sheet Presentation: Double-Background Color Shift (iOS 26+)
+
+When a view controller is presented as a sheet (`.automatic` / `.pageSheet`), iOS 26 inserts a `UIDropShadowView` with rounded corners and material compositing between the presenting and presented view controllers.
+
+If a subview (e.g., `UICollectionView`) has the **same opaque backgroundColor** as the root view, two opaque layers of the same color are composited through the sheet's material pipeline. GPU floating-point precision and color space conversion (sRGB ↔ Display P3) produce a **subtle but visible color seam** at the boundary where the subview starts.
+
+```
+❌ Two opaque layers — visible seam
+┌─ Sheet material ──────────────┐
+│  ┌─ VC.view (theme.bg) ──────┐│
+│  │  Search bar area           ││  ← one layer
+│  │  ┌─ CollectionView ─────┐ ││
+│  │  │  (theme.bg, opaque)  │ ││  ← two layers composited
+│  │  └──────────────────────┘ ││
+│  └────────────────────────────┘│
+└────────────────────────────────┘
+
+✅ Single background layer — no seam
+│  │  ┌─ CollectionView ─────┐ ││
+│  │  │  (.clear)             │ ││  ← root view shows through
+│  │  └──────────────────────┘ ││
+```
+
+### Fix
+
+Set scroll view / collection view / table view `backgroundColor = .clear` and let the VC's root view be the **sole background provider**:
+
+```swift
+private func applyTheme() {
+    ThemeApplier.apply(to: self)          // sets view.backgroundColor
+    collectionView.backgroundColor = .clear // ← single background source
+}
+```
+
+### When this bites
+
+- Sheet-presented screens with a search bar above a scroll view (the seam appears at the search bar / list boundary)
+- Any modal with subviews that duplicate the root view's background color
+- More visible on P3 displays and with non-neutral theme colors (warm grays, tinted backgrounds)
+
+### Does NOT affect
+
+- Full-screen presentations (no sheet material layer)
+- Views where the scroll view intentionally has a different background color
+- Pre-iOS 26 (no `UIDropShadowView` in the hierarchy)
+
 ## Diagnostic Checklist
 
 | Symptom | Likely cause |
@@ -136,3 +182,4 @@ When Auto Layout sets this view's frame, its `layoutSubviews` fires and the laye
 | Shadow visible on sides but clipped at bottom | Insufficient bottom margin for shadow extent |
 | Shadow flickers during scroll | Shadow is recalculated per frame — set `shadowPath` for performance |
 | Gradient/shape layer invisible on first display, appears after navigate-back | Layer frame set from a parent's `layoutSubviews` reading a deep child's bounds (still zero). Move layer to a subclass that manages it in its own `layoutSubviews` |
+| Subtle color seam between search bar area and scroll content (iOS 26 sheet) | Scroll view has same opaque backgroundColor as root view — set scroll view to `.clear` |
