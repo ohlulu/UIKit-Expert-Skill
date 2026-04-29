@@ -39,6 +39,6 @@ Consult the reference file for each topic relevant to the current task. Apply al
 | Keyboard avoidance (scroll view inset adjustment, keyboardWillChangeFrame, animation sync, inputView handling, first responder scrolling) | [keyboard-avoidance](references/keyboard-avoidance.md) |
 | Menu vs popover (UIMenu for flat option selection, UIPopover for custom UI, decision rule, sizing pitfalls, migration guide) | [menu-vs-popover](references/menu-vs-popover.md) |
 | Auto Layout spacing and distribution (setCustomSpacing, CSS flex vs AL, spacer view pitfalls, independent top/bottom pinning, flexible gap strategies) | [autolayout-spacing](references/autolayout-spacing.md) |
-| Navigation bar appearance (UINavigationBarAppearance slots, iOS 26 backgroundColor breaking change, Liquid Glass compatibility, three-slot consistency) | [navigation-bar-appearance](references/navigation-bar-appearance.md) |
+| Navigation bar appearance (UINavigationBarAppearance slots, iOS 26 backgroundColor breaking change, Liquid Glass compatibility, three-slot consistency, large title collapse scroll tracking, alwaysBounceVertical) | [navigation-bar-appearance](references/navigation-bar-appearance.md) |
 | Testing principles (test levels, async spies, assertion strategy, memory leak tracking) | [testing-principles](references/testing-principles.md) |
 | UIKit testing (lifecycle simulation, semantic list helpers, reuse/visibility tests, pagination integration tests, screen integration tests) | [testing](references/testing.md) |

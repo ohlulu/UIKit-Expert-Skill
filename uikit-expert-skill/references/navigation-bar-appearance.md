@@ -61,6 +61,34 @@ Apple DTS explicitly recommends moving away from `UINavigationBarAppearance.back
 
 Setting all three to the same object gives a consistent bar in all states. When they differ, the system animates between them during scroll transitions.
 
+## Large Title Collapse — Scroll View Tracking
+
+UINavigationController automatically finds the first UIScrollView in the visible VC's hierarchy and tracks its `contentOffset` to collapse/expand the large title. If this tracking fails, the large title stays stuck in its initial state (usually expanded) with no error or warning.
+
+### Requirements for Tracking to Work
+
+1. **First scroll view wins** — the scroll view must be the first (or only) scroll view added to the VC's view. If a decorative scroll view sits above the main one in the subview order, the nav bar tracks the wrong one.
+2. **Top edge pinned to `view.topAnchor`** — not `safeAreaLayoutGuide.topAnchor`. The navigation controller adjusts safe-area insets itself; pinning to safe area causes double-inset and breaks offset tracking.
+3. **`alwaysBounceVertical = true`** — when content is shorter than the scroll view's height, iOS won't generate scroll events. Without bounce, the large title never receives the offset change needed to collapse. Set this on any scroll-view-based screen that uses large titles.
+4. **`contentInsetAdjustmentBehavior = .automatic`** (default) — don't set `.never` unless you manually handle the navigation bar inset.
+
+### Quick Checklist
+
+```swift
+scrollView.alwaysBounceVertical = true          // ← most common miss
+scrollView.topAnchor.constraint(equalTo: view.topAnchor)  // NOT safeArea
+// contentInsetAdjustmentBehavior stays .automatic (default)
+```
+
+### Symptoms of Broken Tracking
+
+| Symptom | Likely cause |
+|---------|--------------|
+| Large title never collapses on scroll | Missing `alwaysBounceVertical` or content too short |
+| Large title collapses but never re-expands | ScrollView pinned to safeArea instead of view |
+| Works on UITableView but not UIScrollView | Table/Collection views set `alwaysBounceVertical` by default; plain UIScrollView doesn't |
+| Works intermittently after push/pop | Another scroll view briefly becomes first in the subview order during transitions |
+
 ## Common Pitfalls
 
 | Pitfall | Why it's wrong |
@@ -69,3 +97,4 @@ Setting all three to the same object gives a consistent bar in all states. When 
 | Only setting `standardAppearance` | `scrollEdgeAppearance` defaults to translucent on iOS 15+, causing a flash when scrolling to top |
 | Creating new appearance objects in `viewWillAppear` without guarding | Replaces appearance mid-transition on push/pop, can cause flicker |
 | Using `UINavigationBar.appearance()` globally + per-instance overrides | Global proxy wins on first layout, then per-instance takes over — ordering is unpredictable |
+| UIScrollView without `alwaysBounceVertical` | Large title stuck — no scroll events when content fits in viewport |
