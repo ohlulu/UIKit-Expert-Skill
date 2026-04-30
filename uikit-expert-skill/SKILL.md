@@ -7,8 +7,10 @@ description: >-
   issues, implementing designs or mockups, adjusting animations, resolving visual
   glitches, writing tests, or doing SDD/Ralph tasks that produce UIKit code.
   Also load when encountering objc_setAssociatedObject, target-action handler
-  lifetime issues, or attaching metadata to views. If the project uses UIKit
-  and you will read or edit .swift view/controller files, load this skill.
+  lifetime issues, attaching metadata to views, or wrapping UIKit views in
+  SwiftUI via UIViewRepresentable (state loops, delegate callbacks, diff-based
+  updates, pre-rendered bitmaps). If the project uses UIKit and you will read
+  or edit .swift view/controller files, load this skill.
 ---
 
 # UIKit Expert Skill
@@ -45,3 +47,4 @@ Consult the reference file for each topic relevant to the current task. Apply al
 | Testing principles (test levels, async spies, assertion strategy, memory leak tracking) | [testing-principles](references/testing-principles.md) |
 | UIKit testing (lifecycle simulation, semantic list helpers, reuse/visibility tests, pagination integration tests, screen integration tests) | [testing](references/testing.md) |
 | Eliminating objc_setAssociatedObject (UIAction closures, subclass stored properties, wrapper views, session object lifetime, delegate conflict pitfall, wrapper identity trap) | [associated-objects](references/associated-objects.md) |
+| UIViewRepresentable bridge (two golden rules, diff-based updateUIView, async delegate→state, coordinator callbacks, programmatic vs user change detection, pre-rendered bitmaps for scroll performance, Swift 6 @preconcurrency delegates) | [uiview-representable](references/uiview-representable.md) |
