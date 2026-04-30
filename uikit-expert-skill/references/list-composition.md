@@ -458,7 +458,12 @@ Generate lifecycle-aware async cleanup.
 
 **Silent delegate failure** — A row controller conforms to `UITableViewDelegate` and implements `trailingSwipeActionsConfigurationForRowAt`. It compiles, tests pass, but swipe actions never appear. Root cause: the container does not forward that method. Fix: check the dispatch manifest before implementing any delegate method in a row controller.
 
-**Force-unwrapping dequeued cells** — `return cell!` after `dequeueReusableCell` crashes if registration is wrong. Prefer `guard let` + `assertionFailure` in debug, or let the dequeue helper return a non-optional (generic dequeue extensions).
+**Force-unwrapping dequeued cells** — Two valid stances:
+
+- **Force-unwrap + test coverage** (Essential Developer approach): registration errors are programmer mistakes that should crash immediately. Snapshot and integration tests exercise `cellForRowAt` — if registration is wrong, the test suite crashes, never ships. A `guard let` returning a blank cell is arguably worse: silent visual degradation in production that no test catches. This stance is valid when the dequeue path has comprehensive test coverage.
+- **Defensive dequeue** (generic helper returning non-optional `T`): the dequeue helper itself handles the force-cast (`as! T`), so call sites use the result directly without `!`. Example: `let cell: MyCell = tableView.dequeueReusableCell()` → use `cell` as a local non-optional, assign to the weak `self.cell` separately.
+
+Both are acceptable. Pick one and be consistent across the project. If using the force-unwrap stance, ensure every cell type has at least one test that triggers `cellForRowAt`.
 
 **Stale cell reference** — A row controller holds `private var cell: MyCell?` for async updates. If `didEndDisplaying` or `prepareForReuse` does not nil it out, a later async callback writes to a reused cell showing different content.
 
@@ -476,7 +481,7 @@ Run this checklist when generating new row/item controllers or modifying a conta
 - [ ] Cell reference is released on `didEndDisplaying` / reuse
 - [ ] Async work is cancelled on `didEndDisplaying` / `cancelPrefetchingForRowsAt`
 - [ ] Identity uses a stable domain value, not a transient `UUID()`
-- [ ] No force-unwrap on dequeued cells
+- [ ] Dequeued cells: either use local non-optional variable, or force-unwrap with test coverage on the `cellForRowAt` path
 - [ ] The pattern is justified — the list actually has heterogeneous cells or per-row async lifecycle
 
 ## Warning Signs
