@@ -30,6 +30,7 @@ Consult the reference file for each topic relevant to the current task. Apply al
 |-------|-----------|
 | File structure (property ordering, extensions, layout placement for UIViewController, UIView, UITableViewCell, and other UIKit subclasses) | [file-structure](references/file-structure.md) |
 | Animation (duration, curve, fade defaults, expand/collapse choreography, stagger reveal, custom layout view height animation pitfalls) | [animation](references/animation.md) |
+| Compound cell row animation (animating row insert/remove in a settings-style compound card cell, UISwitch distortion trap, performBatchUpdates vs invalidateLayout in compositional layout, UIStackView isHidden animation) | [compound-cell-row-animation](references/compound-cell-row-animation.md) |
 | Cell registration (CellRegistration vs legacy register/dequeue, pitfalls, handler lifecycle, retain cycles, dynamic cell types) | [cell-registration](references/cell-registration.md) |
 | List composition (heterogeneous cells, row/item controllers, section controllers, load-more controller, pagination seam, diffable, compositional layout, default shapes) | [list-composition](references/list-composition.md) |
 | Screen composition / composer (programmatic controller instantiation, dependency wiring, navigation closures, scene root composition) | [composer](references/composer.md) |
