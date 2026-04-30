@@ -2,11 +2,13 @@
 name: uikit-expert-skill
 description: >-
   UIKit best practices for view lifecycle, Auto Layout, table/collection views,
-  navigation, animation, and testability. Load whenever working in a UIKit
-  codebase — building features, fixing bugs, debugging layout issues, implementing
-  designs or mockups, adjusting animations, resolving visual glitches, writing
-  tests, or doing SDD/Ralph tasks that produce UIKit code. If the project uses
-  UIKit and you will read or edit .swift view/controller files, load this skill.
+  navigation, animation, associated objects, and testability. Load whenever
+  working in a UIKit codebase — building features, fixing bugs, debugging layout
+  issues, implementing designs or mockups, adjusting animations, resolving visual
+  glitches, writing tests, or doing SDD/Ralph tasks that produce UIKit code.
+  Also load when encountering objc_setAssociatedObject, target-action handler
+  lifetime issues, or attaching metadata to views. If the project uses UIKit
+  and you will read or edit .swift view/controller files, load this skill.
 ---
 
 # UIKit Expert Skill
@@ -42,3 +44,4 @@ Consult the reference file for each topic relevant to the current task. Apply al
 | Navigation bar appearance (UINavigationBarAppearance slots, iOS 26 backgroundColor breaking change, Liquid Glass compatibility, three-slot consistency, large title collapse scroll tracking, alwaysBounceVertical) | [navigation-bar-appearance](references/navigation-bar-appearance.md) |
 | Testing principles (test levels, async spies, assertion strategy, memory leak tracking) | [testing-principles](references/testing-principles.md) |
 | UIKit testing (lifecycle simulation, semantic list helpers, reuse/visibility tests, pagination integration tests, screen integration tests) | [testing](references/testing.md) |
+| Eliminating objc_setAssociatedObject (UIAction closures, subclass stored properties, wrapper views, session object lifetime, delegate conflict pitfall, wrapper identity trap) | [associated-objects](references/associated-objects.md) |
