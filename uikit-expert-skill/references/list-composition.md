@@ -61,13 +61,38 @@ A row/item controller owns:
 ### Default Row Wrapper (UITableView)
 
 ```swift
+/// Conform to this to create a row controller wrappable in CellController.
+///
+/// Only `cellForRowAt` is required. The diffable data source handles
+/// `numberOfRowsInSection` — do not implement it in row controllers.
+///
+/// The container dispatches ONLY these delegate methods to row controllers:
+///   UITableViewDelegate:
+///     - willDisplay(_:forRowAt:)
+///     - didEndDisplaying(_:forRowAt:)
+///     - didSelectRowAt(_:)
+///   UITableViewDataSourcePrefetching:
+///     - prefetchRowsAt(_:)
+///     - cancelPrefetchingForRowsAt(_:)
+///
+/// Any other delegate method is silently ignored. If your row controller
+/// needs a method not listed above, add the forwarding to the container
+/// first, then update the dispatch manifest.
+protocol CellControllerDataSource {
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell
+}
+
 struct CellController {
     let id: AnyHashable
-    let dataSource: UITableViewDataSource
+    let dataSource: CellControllerDataSource
     let delegate: UITableViewDelegate?
     let prefetching: UITableViewDataSourcePrefetching?
 
-    init(id: AnyHashable, _ dataSource: UITableViewDataSource) {
+    /// - Parameter dataSource: The row controller. Also checked at init time
+    ///   for UITableViewDelegate and UITableViewDataSourcePrefetching via
+    ///   runtime casting — only the methods listed in the dispatch manifest
+    ///   will actually be forwarded by the container.
+    init(id: AnyHashable, _ dataSource: CellControllerDataSource) {
         self.id = id
         self.dataSource = dataSource
         self.delegate = dataSource as? UITableViewDelegate
@@ -90,18 +115,29 @@ extension CellController: Hashable {
 
 Derive equality and hashing from `id` only. The stored data source and delegate are behavior, not identity.
 
+The `CellControllerDataSource` protocol replaces raw `UITableViewDataSource` conformance. This eliminates the vestigial `numberOfRowsInSection` from every row controller — the diffable data source already manages row counts from the snapshot. If a project prefers the original approach (conforming directly to `UITableViewDataSource`), that works too — just keep `numberOfRowsInSection` returning `1` in every row controller.
+
 ### Default Item Wrapper (UICollectionView)
 
+Same principle — extract a protocol for the minimal required method:
+
 ```swift
+/// UICollectionView counterpart of CellControllerDataSource.
+/// Only `cellForItemAt` is required. The diffable data source handles
+/// `numberOfItemsInSection`.
+protocol ItemControllerDataSource {
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell
+}
+
 struct CellController {
     let id: AnyHashable
-    let dataSource: UICollectionViewDataSource
-    let delegate: UICollectionViewDelegate
+    let dataSource: ItemControllerDataSource
+    let delegate: UICollectionViewDelegate?
 
-    init(id: AnyHashable, _ dataSource: UICollectionViewDataSource & UICollectionViewDelegate) {
+    init(id: AnyHashable, _ dataSource: ItemControllerDataSource) {
         self.id = id
         self.dataSource = dataSource
-        self.delegate = dataSource
+        self.delegate = dataSource as? UICollectionViewDelegate
     }
 }
 
@@ -121,7 +157,7 @@ extension CellController: Hashable {
 ### Row Controller Skeleton
 
 ```swift
-final class AvatarRowController: NSObject, UITableViewDataSource, UITableViewDelegate, UITableViewDataSourcePrefetching {
+final class AvatarRowController: NSObject, CellControllerDataSource, UITableViewDelegate, UITableViewDataSourcePrefetching {
     private let model: AvatarViewModel
     private weak var cell: AvatarCell?
 
@@ -129,7 +165,7 @@ final class AvatarRowController: NSObject, UITableViewDataSource, UITableViewDel
         self.model = model
     }
 
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { 1 }
+    // No numberOfRowsInSection — the diffable data source handles it.
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell: AvatarCell = tableView.dequeueReusableCell()
@@ -147,7 +183,7 @@ final class AvatarRowController: NSObject, UITableViewDataSource, UITableViewDel
 
 Hard rules:
 - one row controller per logical row type
-- each row controller returns exactly 1 from `numberOfRowsInSection` — the diffable data source maps one `CellController` to one row; returning a different number breaks identity dispatch
+- one `CellController` = one row/item — this is enforced by the diffable data source snapshot, not by `numberOfRowsInSection` in the row controller
 - store the model the row needs
 - release stale cell references on reuse / end-display
 - guard duplicate async starts in the controller or loader
@@ -206,6 +242,9 @@ Keep the container as a forwarding shell. Do not rebuild row behavior inside a l
 ```swift
 final class ListViewController: UITableViewController, UITableViewDataSourcePrefetching {
     private lazy var dataSource = UITableViewDiffableDataSource<Int, CellController>(tableView: tableView) {
+        // DISPATCH MANIFEST — only these methods reach row controllers:
+        // UITableViewDelegate:  willDisplay, didEndDisplaying, didSelectRowAt
+        // Prefetching:          prefetchRowsAt, cancelPrefetchingForRowsAt
         tableView, indexPath, controller in
         controller.dataSource.tableView(tableView, cellForRowAt: indexPath)
     }
@@ -343,7 +382,7 @@ struct LoadMoreViewModel {
     }
 }
 
-final class LoadMoreCellController: NSObject, UITableViewDataSource, UITableViewDelegate {
+final class LoadMoreCellController: NSObject, CellControllerDataSource, UITableViewDelegate {
     private let cell = LoadMoreCell()
     private let requestNextPage: () -> Void
     private var isRequestInFlight = false
@@ -353,7 +392,7 @@ final class LoadMoreCellController: NSObject, UITableViewDataSource, UITableView
         self.requestNextPage = requestNextPage
     }
 
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { 1 }
+    // No numberOfRowsInSection — the diffable data source handles it.
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         cell.selectionStyle = .none
@@ -431,7 +470,7 @@ Generate lifecycle-aware async cleanup.
 
 Run this checklist when generating new row/item controllers or modifying a container:
 
-- [ ] Row controller returns exactly `1` from `numberOfRowsInSection`
+- [ ] Row controller conforms to `CellControllerDataSource` (or `ItemControllerDataSource`), NOT raw `UITableViewDataSource` — no `numberOfRowsInSection`
 - [ ] Every delegate method the row controller implements is in the container's dispatch manifest
 - [ ] If a new delegate method is needed, the container forwarding is added **and** the manifest is updated
 - [ ] Cell reference is released on `didEndDisplaying` / reuse
