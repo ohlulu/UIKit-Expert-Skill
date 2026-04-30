@@ -12,6 +12,25 @@ Goal:
 
 For simple lists, prefer direct `UITableViewDiffableDataSource`, `UICollectionViewDiffableDataSource`, `CellRegistration`, or a focused view controller.
 
+## Design Intent
+
+The pattern exists to solve one problem: **a growing `switch indexPath` in a view controller that mixes cell creation, async loading, cancellation, and selection for many different cell types.**
+
+The solution decomposes into three roles:
+
+| Role | Responsibility | Knows about concrete cell types? |
+|------|---------------|----------------------------------|
+| **Row/Item Controller** | Owns one row's full lifecycle — create, configure, display, prefetch, cancel, select | Yes — exactly one |
+| **Wrapper (CellController)** | Type-erases the row controller so heterogeneous controllers can live in one diffable snapshot | No |
+| **Container (ListViewController)** | Holds the diffable data source, forwards delegate calls to the correct wrapper | No |
+
+Key architectural properties:
+- **Open-Closed**: new cell types = new row controller class; container and wrapper unchanged
+- **No base class**: the wrapper is a struct; concrete controllers are independent objects
+- **Composition Root assembly**: the place that creates row controllers and wraps them into `CellController` is outside all three roles
+
+Adapt the shapes to the project. The code skeletons below are starting points — not sacred templates. What matters is preserving the three-role separation and the dispatch contract.
+
 ## Decision Rule
 
 ### Consider row/item controllers when the list has:
@@ -128,9 +147,12 @@ final class AvatarRowController: NSObject, UITableViewDataSource, UITableViewDel
 
 Hard rules:
 - one row controller per logical row type
+- each row controller returns exactly 1 from `numberOfRowsInSection` — the diffable data source maps one `CellController` to one row; returning a different number breaks identity dispatch
 - store the model the row needs
 - release stale cell references on reuse / end-display
 - guard duplicate async starts in the controller or loader
+- never assume which section or index the controller lives in — the container handles routing
+- only rely on delegate methods the container explicitly forwards (see Dispatch Contract below)
 
 ## Section Controllers
 
@@ -228,6 +250,29 @@ final class ListViewController: UITableViewController, UITableViewDataSourcePref
 ```
 
 Assign `tableView.dataSource = dataSource` and `tableView.prefetchDataSource = self` when configuring the table view.
+
+### Dispatch Contract
+
+The container is a **forwarding shell**. It only dispatches a fixed set of delegate/prefetch methods to row controllers. Any delegate method a row controller implements but the container does not forward is **silently ignored** — no compile-time error, no runtime warning.
+
+When creating or modifying a container, maintain an explicit dispatch manifest:
+
+```swift
+// DISPATCH MANIFEST — only these methods reach row controllers:
+// UITableViewDelegate:
+//   - willDisplay(_:forRowAt:)
+//   - didEndDisplaying(_:forRowAt:)
+//   - didSelectRowAt(_:)
+// UITableViewDataSourcePrefetching:
+//   - prefetchRowsAt(_:)
+//   - cancelPrefetchingForRowsAt(_:)
+```
+
+Rules:
+- add the manifest as a comment in the container source
+- when a row controller needs a delegate method not in the manifest, **add the forwarding to the container first**, then update the manifest
+- never assume a row controller's delegate method will be called just because the controller conforms to the protocol
+- review the manifest when adding new row controller types — if they need methods not yet forwarded, that is a container change, not a row controller problem
 
 ### UICollectionView Container Skeleton
 
@@ -369,6 +414,31 @@ Generate lifecycle-aware async cleanup.
 - Cancel work on end-display / cancel-prefetch / reuse boundaries.
 - Do not keep stale cell references after reuse.
 - Do not update a reused cell for an old model.
+
+## Common Pitfalls
+
+**Silent delegate failure** — A row controller conforms to `UITableViewDelegate` and implements `trailingSwipeActionsConfigurationForRowAt`. It compiles, tests pass, but swipe actions never appear. Root cause: the container does not forward that method. Fix: check the dispatch manifest before implementing any delegate method in a row controller.
+
+**Force-unwrapping dequeued cells** — `return cell!` after `dequeueReusableCell` crashes if registration is wrong. Prefer `guard let` + `assertionFailure` in debug, or let the dequeue helper return a non-optional (generic dequeue extensions).
+
+**Stale cell reference** — A row controller holds `private var cell: MyCell?` for async updates. If `didEndDisplaying` or `prepareForReuse` does not nil it out, a later async callback writes to a reused cell showing different content.
+
+**Identity drift** — Using `UUID()` as `CellController.id` on every refresh defeats diffable diffing. Items flash-reload instead of animating. Use domain identity (model ID) so the same logical item keeps its controller across updates.
+
+**Over-applying the pattern** — A screen with one static cell type and no async work does not need row controllers. The indirection adds files and dispatch hops with zero benefit. See Warning Signs below.
+
+## Generation Checklist
+
+Run this checklist when generating new row/item controllers or modifying a container:
+
+- [ ] Row controller returns exactly `1` from `numberOfRowsInSection`
+- [ ] Every delegate method the row controller implements is in the container's dispatch manifest
+- [ ] If a new delegate method is needed, the container forwarding is added **and** the manifest is updated
+- [ ] Cell reference is released on `didEndDisplaying` / reuse
+- [ ] Async work is cancelled on `didEndDisplaying` / `cancelPrefetchingForRowsAt`
+- [ ] Identity uses a stable domain value, not a transient `UUID()`
+- [ ] No force-unwrap on dequeued cells
+- [ ] The pattern is justified — the list actually has heterogeneous cells or per-row async lifecycle
 
 ## Warning Signs
 
