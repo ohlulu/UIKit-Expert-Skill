@@ -203,6 +203,51 @@ Generate a section controller only when the section owns:
 
 Keep the API narrow. Do not expose the full `UITableViewDelegate` surface unless the project already uses that pattern consistently.
 
+#### Section-Level Delegate Dispatch
+
+Section-level delegate methods (header/footer) and cell-level delegate methods (selection, swipe, display) belong to different dispatch targets:
+
+```swift
+protocol SectionControllerDataSource {
+    func cellControllers() -> [CellController]
+}
+
+struct SectionController {
+    let dataSource: SectionControllerDataSource
+    let sectionDelegate: UITableViewDelegate?
+
+    init(dataSource: SectionControllerDataSource) {
+        self.dataSource = dataSource
+        self.sectionDelegate = dataSource as? UITableViewDelegate
+    }
+}
+```
+
+The container forwards at two levels:
+
+```swift
+// SECTION-LEVEL DISPATCH — header/footer → SectionController.sectionDelegate
+override func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
+    sectionController(at: section).sectionDelegate?.tableView?(tableView, viewForHeaderInSection: section)
+}
+
+override func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
+    sectionController(at: section).sectionDelegate?.tableView?(tableView, heightForHeaderInSection: section)
+        ?? .leastNonzeroMagnitude
+}
+
+// CELL-LEVEL DISPATCH — selection/swipe/display → CellController.delegate
+override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+    cellController(at: indexPath)?.delegate?.tableView?(tableView, didSelectRowAt: indexPath)
+}
+```
+
+Rules:
+- section-level methods go to `SectionController.sectionDelegate`, not to individual cell controllers
+- cell-level methods go to `CellController.delegate`
+- maintain separate dispatch manifests for each level
+- a section controller that only groups cells (no header/footer behavior) does not need `UITableViewDelegate` conformance
+
 ### UICollectionView + Compositional Layout
 
 Section controllers are more justified here. A collection section may own:
@@ -226,6 +271,38 @@ struct SectionController: Hashable {
 ```
 
 Generate this by default for compositional layout when sections differ meaningfully in layout, supplementary views, or item composition.
+
+### Stateful Section Controllers
+
+A section controller may own UI state that affects which cells are shown. This is one of the strongest justifications for the section controller abstraction.
+
+Example: an expand/collapse section that controls cell visibility:
+
+```swift
+final class PinnedSectionController: SectionControlling {
+    private(set) var isExpanded = true
+    private let allCells: [CellController]
+
+    var cells: [CellController] {
+        isExpanded ? allCells : []
+    }
+
+    func toggle() {
+        isExpanded.toggle()
+    }
+
+    // layoutSection, supplementaryView ...
+}
+```
+
+When the section is collapsed, it returns an empty array. The diffable snapshot reflects this — the section exists (header/supplementary visible) but contains zero items.
+
+Other cases where section state is justified:
+- sections that show a subset of items based on a filter
+- sections that conditionally include a "show all" item
+- sticky headers that need to track scroll position and update appearance
+
+If a section controller holds no state and its `cellControllers()` is a pure pass-through, it probably doesn't need to be a full class — a struct or even inline construction is enough.
 
 ## Containers
 
@@ -317,10 +394,21 @@ Rules:
 
 ```swift
 final class ProductListViewController: UIViewController {
-    private lazy var dataSource = UICollectionViewDiffableDataSource<SectionController, CellController>(collectionView: collectionView) {
-        collectionView, indexPath, controller in
-        controller.dataSource.collectionView(collectionView, cellForItemAt: indexPath)
-    }
+    private lazy var dataSource: UICollectionViewDiffableDataSource<SectionController, CellController> = {
+        let ds = UICollectionViewDiffableDataSource<SectionController, CellController>(collectionView: collectionView) {
+            collectionView, indexPath, controller in
+            controller.dataSource.collectionView(collectionView, cellForItemAt: indexPath)
+        }
+
+        // Supplementary views are delegated to the section controller.
+        ds.supplementaryViewProvider = { [weak ds] collectionView, kind, indexPath in
+            ds?.sectionIdentifier(for: indexPath.section)?
+                .dataSource
+                .supplementaryView(for: collectionView, kind: kind, at: indexPath)
+        }
+
+        return ds
+    }()
 
     private func makeLayout() -> UICollectionViewLayout {
         UICollectionViewCompositionalLayout { [weak self] sectionIndex, environment in
@@ -332,8 +420,11 @@ final class ProductListViewController: UIViewController {
 }
 ```
 
+The `supplementaryViewProvider` delegates to the section controller's `supplementaryView(for:kind:at:)`. Each section controller decides what headers, footers, or decorations it needs — the container never switches on section index to pick a supplementary view.
+
 Hard rules:
-- keep global layout configuration at the screen/container level
+- keep global layout configuration (e.g. `UICollectionViewCompositionalLayoutConfiguration` with pinned global headers) at the container level
+- per-section layout and supplementary views belong to the section controller
 - do not move section-specific layout decisions back into a large screen-level switch once section controllers exist
 
 ## Incremental Pagination
