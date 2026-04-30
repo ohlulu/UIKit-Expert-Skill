@@ -99,6 +99,37 @@ let adapter = FeedLoaderAdapter(
 
 The controller reports the user event. The injected closure decides whether that event pushes, presents, or does something else. This keeps navigation decisions outside the view controller while still making the wiring explicit at composition time.
 
+### Callback Shape
+
+Navigation closures should carry data out, not pass callbacks back in.
+
+**Avoid closure-of-closures** — a navigation closure whose parameters include one or more `@escaping` callback closures. This creates nested callback chains that are hard to read, hard to extend, and tightly couple the controller to the coordinator's wiring.
+
+```swift
+// BAD — 3 nested callbacks inside a navigation closure
+var onAddField: ((_ definitions: [FieldDefinition],
+                  _ onSelect: @escaping (Int64) -> Void,
+                  _ onCreated: @escaping (FieldDefinition, String) -> Void,
+                  _ onDeleted: @escaping (Int64) -> Void) -> Void)?
+```
+
+**Use a sum type** when a child screen can produce multiple distinct results. Collapse N callbacks into one `(Result) -> Void`.
+
+```swift
+enum AddFieldResult {
+    case selected(definitionId: Int64)
+    case customCreated(definition: FieldDefinition, initialValue: String)
+    case definitionDeleted(id: Int64)
+}
+
+var onAddField: ((_ definitions: [FieldDefinition],
+                  _ onResult: @escaping (AddFieldResult) -> Void) -> Void)?
+```
+
+Benefits: exhaustive switch catches missing cases, adding a new action is one enum case, and both VC and coordinator read linearly.
+
+**Threshold:** a single callback parameter (e.g., `onNoteContent: @escaping (String) -> Void`) is acceptable. Two or more → extract a result enum.
+
 ## Scene Root Composition
 
 When a scene needs a root navigation stack plus child-screen composition, keep that wiring in the scene layer and delegate each screen to its composer.
@@ -154,3 +185,4 @@ The composition boundary is drifting when:
 - a view controller fetches app dependencies directly
 - the composer starts rendering or mapping view models itself
 - the same controller initialization and callback wiring is duplicated across call sites
+- a navigation closure accepts two or more `@escaping` callback parameters (closure-of-closures)
