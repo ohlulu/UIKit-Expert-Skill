@@ -371,18 +371,7 @@ Assign `tableView.dataSource = dataSource` and `tableView.prefetchDataSource = s
 
 The container is a **forwarding shell**. It only dispatches a fixed set of delegate/prefetch methods to row controllers. Any delegate method a row controller implements but the container does not forward is **silently ignored** — no compile-time error, no runtime warning.
 
-When creating or modifying a container, maintain an explicit dispatch manifest:
-
-```swift
-// DISPATCH MANIFEST — only these methods reach row controllers:
-// UITableViewDelegate:
-//   - willDisplay(_:forRowAt:)
-//   - didEndDisplaying(_:forRowAt:)
-//   - didSelectRowAt(_:)
-// UITableViewDataSourcePrefetching:
-//   - prefetchRowsAt(_:)
-//   - cancelPrefetchingForRowsAt(_:)
-```
+When creating or modifying a container, maintain an explicit dispatch manifest. The canonical list of forwarded methods lives in the `CellControllerDataSource` protocol doc comment (see Default Row Wrapper above) — the container's manifest comment should mirror it.
 
 Rules:
 - add the manifest as a comment in the container source
@@ -535,15 +524,6 @@ Generate stable identity by default.
 - Use domain identity when the same logical item survives refreshes.
 - Do not generate fresh random identifiers on every update unless the row is intentionally transient.
 - Preserve an existing controller for the same logical model when it owns meaningful UI state or in-flight work.
-
-## Async Lifecycle
-
-Generate lifecycle-aware async cleanup.
-
-- Reset visible state before starting a request.
-- Cancel work on end-display / cancel-prefetch / reuse boundaries.
-- Do not keep stale cell references after reuse.
-- Do not update a reused cell for an old model.
 
 ## Common Pitfalls
 
