@@ -9,7 +9,10 @@ description: >-
   Also load when encountering objc_setAssociatedObject, target-action handler
   lifetime issues, attaching metadata to views, or wrapping UIKit views in
   SwiftUI via UIViewRepresentable (state loops, delegate callbacks, diff-based
-  updates, pre-rendered bitmaps). If the project uses UIKit and you will read
+  updates, pre-rendered bitmaps). Also load when working with iCloud ubiquity
+  containers — startDownloadingUbiquitousItem, NSMetadataQuery discovery,
+  NSUbiquitousContainers, or iCloud backup/restore flows.
+  If the project uses UIKit and you will read
   or edit .swift view/controller files, load this skill.
 ---
 
@@ -50,3 +53,4 @@ Consult the reference file for each topic relevant to the current task. Apply al
 | UIKit testing (lifecycle simulation, semantic list helpers, reuse/visibility tests, pagination integration tests, screen integration tests) | [testing](references/testing.md) |
 | Eliminating objc_setAssociatedObject (UIAction closures, subclass stored properties, wrapper views, session object lifetime, delegate conflict pitfall, wrapper identity trap) | [associated-objects](references/associated-objects.md) |
 | UIViewRepresentable bridge (two golden rules, diff-based updateUIView, async delegate→state, coordinator callbacks, programmatic vs user change detection, pre-rendered bitmaps for scroll performance, Swift 6 @preconcurrency delegates) | [uiview-representable](references/uiview-representable.md) |
+| iCloud ubiquity container (NSMetadataQuery discovery, startDownloadingUbiquitousItem, progress-based timeout, bulk download, ubiquitousItemDownloadingErrorKey, NSUbiquitousContainers Files app visibility, fresh-install restore) | [icloud-ubiquity](references/icloud-ubiquity.md) |
