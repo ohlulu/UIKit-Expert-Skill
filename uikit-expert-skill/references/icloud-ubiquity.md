@@ -140,13 +140,39 @@ By default, an app's iCloud ubiquity container is **invisible** in the Files app
 ### Requirements
 
 - App must have `com.apple.developer.icloud-container-identifiers` entitlement with matching container ID
-- Files must be under the container's `Documents/` directory
 - Container ID in plist must match entitlement exactly
+- **`FileManager.url(forUbiquityContainerIdentifier:)` must have been called at least once** — this is what actually creates the container on iCloud's servers; the plist only declares visibility intent
+- **The `Documents/` directory must exist** — an empty or non-existent directory means nothing to show in Files app
+
+### Trap: Plist Alone Does Not Create the Container
+
+`NSUbiquitousContainers` tells Files app "this container is allowed to be visible." But the container directory won't appear in iCloud Drive until **both** conditions are met:
+
+1. `FileManager.url(forUbiquityContainerIdentifier:)` has been called → creates the container on iCloud's servers
+2. The `Documents/` subdirectory exists on disk
+
+If the app only calls `url(forUbiquityContainerIdentifier:)` lazily (e.g. during backup), users who never back up will never see the folder. **Fix**: eagerly touch the container at app startup.
+
+```swift
+// Call at DI init / app launch — cheap and idempotent
+func ensureContainerExists() {
+    guard FileManager.default.ubiquityIdentityToken != nil else { return }
+    guard let container = FileManager.default.url(
+        forUbiquityContainerIdentifier: containerID
+    ) else { return }
+    let docs = container.appendingPathComponent("Documents")
+    try? FileManager.default.createDirectory(
+        at: docs, withIntermediateDirectories: true
+    )
+}
+```
+
+This works for both fresh installs and app updates — iOS re-reads Info.plist on every install/update, and the eager init ensures the container is ready.
 
 ### Behavior
 
 - Folder appears in Files app → iCloud Drive after app update (no fresh install required)
-- Appearance may be delayed until iCloud re-indexes the container
+- Appearance may be delayed until iCloud re-indexes the container; pull-to-refresh in Files helps
 - **Users can delete, rename, or move files** — treat the Documents directory as user-owned
 - Useful as a recovery path: users can manually trigger iCloud sync by opening the folder in Files
 
