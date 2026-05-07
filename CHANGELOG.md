@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-05-07
+
+- Added iCloud ubiquity container reference — `startDownloadingUbiquitousItem`, `NSMetadataQuery` discovery, `NSUbiquitousContainers` eager-init gotcha.
+- Added popover-tooltip reference — safe-area centering trap.
+- Fixed release skill flow to zero-gate after version confirmation.
+
 ## [0.3.0] — 2026-05-01
 
 - Added self-sizing reference — `systemLayoutSizeFitting`, `preferredContentSize`, cell auto-dimension.
