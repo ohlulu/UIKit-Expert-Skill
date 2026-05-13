@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-05-13
+
+- **Breaking**: Renamed skill from `uikit-expert-skill` to `apple-dev-skill`.
+- **Breaking**: Renamed GitHub repo from `UIKit-Expert-Skill` to `Apple-Dev-Skill`.
+- Merged `xcode-skill` (Xcode/Tuist project setup, xcconfig, build phases, Makefile, shared schemes, gotchas) into this skill.
+- Merged `swift-coding-style` (type design, protocols, error handling, API design, file organization) into this skill.
+- Added Topic Router sections for Xcode/Project Setup and Swift Coding Style.
+- Added 7 new reference files: xcode-project-setup, xcconfig, build-phases, makefile, Makefile.template, tuist-spm-integration, xcodebuild-error-detection, swift-style.
+
 ## [0.4.0] — 2026-05-07
 
 - Added iCloud ubiquity container reference — `startDownloadingUbiquitousItem`, `NSMetadataQuery` discovery, `NSUbiquitousContainers` eager-init gotcha.

@@ -1,0 +1,226 @@
+# ============================================================================
+# Makefile — {{PROJECT_NAME}}
+# ============================================================================
+#
+# Usage:  make            → show help
+#         make test       → run default tests
+#         make test-all   → run all test suites
+#         make release    → test + archive + upload
+#
+# Conventions:
+#   - Every public target has a ## comment above it (shown in `make help`)
+#   - `xc` macro centralises all xcodebuild calls
+#   - Complex operations delegate to scripts/
+
+.DEFAULT_GOAL := help
+
+SHELL     := /bin/bash
+REPO_ROOT := $(CURDIR)
+
+# ---------------------------------------------------------------------------
+# Config — adapt these to your project
+# ---------------------------------------------------------------------------
+
+# Simulator destination (match your deployment target)
+SIM := platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4
+
+# DerivedData — project-local to avoid cross-project cache pollution
+DD := $(REPO_ROOT)/.derivedData
+
+# Test log directory — project-local, not /tmp (avoids cross-worktree clobber)
+LOGDIR := $(REPO_ROOT)/.test-logs
+
+# Xcode workspace/project and schemes
+# Uncomment the one that matches your project:
+# XC_WORKSPACE := -workspace MyApp.xcworkspace
+# XC_PROJECT   := -project MyApp.xcodeproj
+
+# Tuist: auto-generated schemes to remove after `tuist generate`
+# UNWANTED_SCHEMES := \
+# 	MyApp.xcworkspace/xcshareddata/xcschemes/Generate\ Project.xcscheme \
+# 	MyApp.xcworkspace/xcshareddata/xcschemes/MyApp-Workspace.xcscheme
+
+# Version source (pick one, delete the others)
+# --- Tuist (Project.swift) ---
+# VERSION_FILE := $(REPO_ROOT)/Project.swift
+# READ_VERSION = grep 'let marketingVersion' $(VERSION_FILE) | sed 's/.*"\(.*\)".*/\1/'
+# SET_VERSION  = sed -i '' 's/let marketingVersion = ".*"/let marketingVersion = "$(VERSION)"/' $(VERSION_FILE)
+# READ_BUILD   = grep 'let currentProjectVersion' $(VERSION_FILE) | sed 's/[^0-9]//g'
+# SET_BUILD    = sed -i '' 's/let currentProjectVersion = ".*"/let currentProjectVersion = "$(1)"/' $(VERSION_FILE)
+# --- xcconfig (Base.xcconfig) ---
+# VERSION_FILE := $(REPO_ROOT)/App/Configurations/Base.xcconfig
+# READ_VERSION = grep '^MARKETING_VERSION' $(VERSION_FILE) | sed 's/.*= *//'
+# SET_VERSION  = sed -i '' 's/^MARKETING_VERSION = .*/MARKETING_VERSION = $(VERSION)/' $(VERSION_FILE)
+# READ_BUILD   = grep '^CURRENT_PROJECT_VERSION' $(VERSION_FILE) | sed 's/.*= *//'
+# SET_BUILD    = sed -i '' 's/^CURRENT_PROJECT_VERSION = .*/CURRENT_PROJECT_VERSION = $(1)/' $(VERSION_FILE)
+
+# ---------------------------------------------------------------------------
+# xc macro — DRY xcodebuild runner
+# ---------------------------------------------------------------------------
+# $(1) log-name
+# $(2) working-dir
+# $(3) extra xcodebuild flags (-scheme, -project, -only-testing, etc.)
+# $(4) action (default: test)
+# $(5) derivedData override (default: DD)
+define xc
+	@mkdir -p $(LOGDIR); \
+	cd $(2) && xcodebuild \
+	  $(3) \
+	  -derivedDataPath "$(or $(5),$(DD))" \
+	  -destination '$(SIM)' \
+	  -skipMacroValidation \
+	  $(or $(4),test) \
+	  > $(LOGDIR)/$(1).log 2>&1; \
+	RESULT=$$?; \
+	grep -E "(✘|✔ Test run|TEST SUCCEEDED|TEST FAILED)" $(LOGDIR)/$(1).log || true; \
+	if [ $$RESULT -ne 0 ]; then \
+	  echo ""; \
+	  echo "  ❌ full log: $(LOGDIR)/$(1).log"; \
+	fi; \
+	exit $$RESULT
+endef
+
+# ---------------------------------------------------------------------------
+# Xcode window management (Tuist projects)
+# ---------------------------------------------------------------------------
+# Close only THIS project's Xcode window before regeneration.
+# Safe no-op if Xcode isn't running or window not found.
+# Replace "{{PROJECT_NAME}}" with actual project name.
+CLOSE_XCODE_WINDOW := osascript \
+  -e 'tell application "System Events"' \
+  -e '  if not (exists process "Xcode") then return' \
+  -e '  tell process "Xcode"' \
+  -e '    set found to false' \
+  -e '    repeat with w in (every window)' \
+  -e '      if name of w starts with "{{PROJECT_NAME}}" then' \
+  -e '        set found to true' \
+  -e '        exit repeat' \
+  -e '      end if' \
+  -e '    end repeat' \
+  -e '    if not found then return' \
+  -e '  end tell' \
+  -e 'end tell' \
+  -e 'tell application "Xcode"' \
+  -e '  set doc to missing value' \
+  -e '  repeat with d in (every workspace document)' \
+  -e '    if name of d starts with "{{PROJECT_NAME}}" then' \
+  -e '      set doc to d' \
+  -e '      exit repeat' \
+  -e '    end if' \
+  -e '  end repeat' \
+  -e '  if doc is missing value then return' \
+  -e '  try' \
+  -e '    stop doc' \
+  -e '  end try' \
+  -e '  delay 0.5' \
+  -e '  close doc' \
+  -e 'end tell'
+
+# ===========================================================================
+# Targets
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Project generation (Tuist)
+# ---------------------------------------------------------------------------
+
+## Close Xcode and regenerate project
+generate:
+	@$(CLOSE_XCODE_WINDOW) 2>/dev/null || true
+	tuist generate
+#	@rm -f $(UNWANTED_SCHEMES)
+#	@echo "Removed unwanted workspace schemes."
+
+# ---------------------------------------------------------------------------
+# Test
+# ---------------------------------------------------------------------------
+
+## Run SPM package tests (fastest feedback loop)
+test:
+	$(call xc,package,., \
+	  -scheme MyPackage)
+
+## Run Xcode project tests
+test-xcode:
+	$(call xc,xcode,., \
+	  $(XC_PROJECT) -scheme MyApp -only-testing:MyAppTests)
+
+## Run all tests (SPM + Xcode)
+test-all: test test-xcode
+
+# Per-module targets — add as needed:
+# ## Run CoreModule tests only
+# test-core:
+# 	$(call xc,core,Packages/Core, \
+# 	  -scheme Core-Package -only-testing:CoreTests)
+
+# ---------------------------------------------------------------------------
+# Version
+# ---------------------------------------------------------------------------
+
+## Bump marketing version (reset build to 1)
+## Usage: make bump VERSION=1.2
+bump:
+	@if [ -z "$(VERSION)" ]; then \
+		echo "❌  Usage: make bump VERSION=1.2"; \
+		exit 1; \
+	fi
+	@$(SET_VERSION)
+	@$(call SET_BUILD,1)
+	@echo "✅  version → $(VERSION), build → 1"
+
+## Increment build number (+1)
+bump-build:
+	@CURRENT=$$($(READ_BUILD)); \
+	NEXT=$$((CURRENT + 1)); \
+	$(call SET_BUILD,$$NEXT); \
+	echo "✅  build → $$NEXT"
+
+# ---------------------------------------------------------------------------
+# Release pipeline (delegates to scripts/)
+# ---------------------------------------------------------------------------
+
+## Pre-flight: git status + version + ASC dashboard
+preflight:
+	@scripts/preflight.sh
+
+## Validate submission readiness
+validate:
+	@scripts/validate.sh
+
+## Run tests → archive → upload to App Store Connect
+release: test-all
+	@scripts/release.sh
+
+## Wait for build processing → submit for review
+## Env: POLL_TIMEOUT=900 make submit  (default: 600s)
+submit:
+	@scripts/submit.sh
+
+## Create and push git tag from current version
+tag:
+	@scripts/tag.sh
+
+# ---------------------------------------------------------------------------
+# Housekeeping
+# ---------------------------------------------------------------------------
+
+## Remove build artifacts
+clean:
+	@rm -rf $(DD) $(LOGDIR)
+	@echo "✅  Cleaned derivedData and test logs."
+
+# ---------------------------------------------------------------------------
+# Help
+# ---------------------------------------------------------------------------
+
+## Show available targets
+help:
+	@awk '/^##/{if(!d){sub(/^## ?/,"");d=$$0};next} /^[a-zA-Z_-]+:/{if(d){printf "  \033[36m%-16s\033[0m %s\n",$$1,d};d=""} !/^##/{d=""}' $(MAKEFILE_LIST)
+
+
+.PHONY: help generate \
+        test test-xcode test-all \
+        bump bump-build \
+        preflight validate release submit tag \
+        clean

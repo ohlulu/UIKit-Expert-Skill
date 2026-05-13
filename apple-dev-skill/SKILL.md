@@ -1,33 +1,38 @@
 ---
-name: uikit-expert-skill
+name: apple-dev-skill
 description: >-
-  UIKit best practices for view lifecycle, Auto Layout, table/collection views,
-  navigation, animation, associated objects, and testability. Load whenever
-  working in a UIKit codebase — building features, fixing bugs, debugging layout
-  issues, implementing designs or mockups, adjusting animations, resolving visual
-  glitches, writing tests, or doing SDD/Ralph tasks that produce UIKit code.
-  Also load when encountering objc_setAssociatedObject, target-action handler
-  lifetime issues, attaching metadata to views, or wrapping UIKit views in
-  SwiftUI via UIViewRepresentable (state loops, delegate callbacks, diff-based
-  updates, pre-rendered bitmaps). Also load when working with iCloud ubiquity
-  containers — startDownloadingUbiquitousItem, NSMetadataQuery discovery,
-  NSUbiquitousContainers, or iCloud backup/restore flows.
-  If the project uses UIKit and you will read
-  or edit .swift view/controller files, load this skill.
+  Apple platform development: UIKit patterns, SwiftUI bridging, Xcode/Tuist
+  project setup, xcconfig, build phases, Makefile, and Swift coding conventions
+  for app development. Load whenever working in an Apple app codebase — building
+  features, fixing bugs, debugging layout or build issues, implementing designs,
+  adjusting animations, writing tests, setting up project structure, or reviewing
+  Swift code in an app context. Also load for objc_setAssociatedObject, UIViewRepresentable
+  bridging, iCloud ubiquity containers, Tuist project generation, xcconfig hierarchy,
+  or build phase scripts.
+  NOT for: server-side Swift (Vapor), Linux Swift, CLI tools, or platform-agnostic
+  SPM libraries — those rely on global rules.
+  Trigger words: "UIKit", "UIViewController", "UIView", "UITableView",
+  "UICollectionView", "Auto Layout", "Xcode", "xcconfig", "build phase",
+  "Tuist", "Makefile", "SwiftUI bridge", "UIViewRepresentable",
+  "Swift style", "type design", "protocol", "error handling",
+  "專案設定", "建置設定", "建置腳本", "iOS", "app development".
 ---
 
-# UIKit Expert Skill
+# Apple Dev Skill
+
+Unified reference for Apple platform app development — UIKit/UI patterns, Xcode project setup, and Swift coding conventions scoped to app contexts.
 
 ## Precedence Rule
 
 When a project already has a clear, established local convention, follow it by default.
-
 Ask the user only when local conventions are ambiguous, conflicting, or likely harmful.
 Do not silently replace a strong project convention with this skill's defaults.
 
 ## Topic Router
 
 Consult the reference file for each topic relevant to the current task. Apply all rules from the matched references — do not skip them for convenience.
+
+### UIKit / UI Patterns
 
 | Topic | Reference |
 |-------|-----------|
@@ -55,3 +60,21 @@ Consult the reference file for each topic relevant to the current task. Apply al
 | Eliminating objc_setAssociatedObject (UIAction closures, subclass stored properties, wrapper views, session object lifetime, delegate conflict pitfall, wrapper identity trap) | [associated-objects](references/associated-objects.md) |
 | UIViewRepresentable bridge (two golden rules, diff-based updateUIView, async delegate→state, coordinator callbacks, programmatic vs user change detection, pre-rendered bitmaps for scroll performance, Swift 6 @preconcurrency delegates) | [uiview-representable](references/uiview-representable.md) |
 | iCloud ubiquity container (NSMetadataQuery discovery, startDownloadingUbiquitousItem, progress-based timeout, bulk download, ubiquitousItemDownloadingErrorKey, NSUbiquitousContainers Files app visibility, fresh-install restore) | [icloud-ubiquity](references/icloud-ubiquity.md) |
+
+### Xcode / Project Setup
+
+| Topic | Reference |
+|-------|-----------|
+| Xcode project setup (workspace layout, synced folders, SPM deps, cross-project refs, app identity, shared schemes, gotchas, warning detection) | [xcode-project-setup](references/xcode-project-setup.md) |
+| xcconfig hierarchy (naming convention, inline vs xcconfig, target-level keys, Xcode upgrade SOP) | [xcconfig](references/xcconfig.md) |
+| Build phase scripts (SwiftFormat pre-commit hook, SwiftLint pre-build, Firebase Crashlytics dSYM upload, script sandboxing) | [build-phases](references/build-phases.md) |
+| Makefile (design principles, simulator destination, run target, adaptation checklist) | [makefile](references/makefile.md) |
+| Makefile template | [Makefile.template](references/Makefile.template) |
+| Tuist SPM integration (native vs XcodeProj-based, wrapper target problem, migration steps) | [tuist-spm-integration](references/tuist-spm-integration.md) |
+| xcodebuild error detection (dual failure detection, exit code + BUILD FAILED grep, CODE_SIGNING_ALLOWED=NO) | [xcodebuild-error-detection](references/xcodebuild-error-detection.md) |
+
+### Swift Coding Style (App Context)
+
+| Topic | Reference |
+|-------|-----------|
+| Swift conventions (opaque vs existential types, type design, protocols, error handling, API design, file organization) | [swift-style](references/swift-style.md) |

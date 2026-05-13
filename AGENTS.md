@@ -1,21 +1,26 @@
-# Agent Guidelines for UIKit Expert Skill
+# Agent Guidelines for Apple Dev Skill
 
 This document provides guidance for AI agents working with this skill to ensure consistency and avoid common pitfalls.
 
 ## Core Principles
 
-### 1. UIKit Focus Only
-**This is a UIKit skill.** Do not include:
-- SwiftUI patterns (except when bridging is necessary)
-- General Swift language features unrelated to UIKit
-- Backend or server-side Swift patterns
-- Swift concurrency deep dives (use UIKit-specific async patterns only)
+### 1. Apple App Development Focus
+**This skill covers Apple platform app development.** It includes:
+- UIKit patterns (and SwiftUI bridging where necessary)
+- Xcode / Tuist project setup, xcconfig, build phases, Makefile
+- Swift coding conventions scoped to app development
+
+**Do not include:**
+- Server-side Swift (Vapor, Hummingbird)
+- Linux Swift or platform-agnostic CLI tools
+- Backend patterns unrelated to Apple platforms
+- Swift concurrency deep dives (use app-specific async patterns only)
 
 ### 2. No Architectural Opinions
 **Stick to facts, not architectures.** Avoid:
 - Enforcing MVVM, MVC, VIPER, or any specific architecture
 - Mandating coordinator patterns
-- Requiring specific folder structures
+- Requiring specific folder structures beyond Xcode project layout
 - Dictating dependency injection patterns
 
 **Exception**: Suggest separating business logic for testability without enforcing how.
@@ -71,26 +76,33 @@ Keep examples minimal:
 - UIKit-specific testing and testability patterns
 - Accessibility best practices
 - Modern UIKit APIs and deprecations
+- Xcode project structure (Tuist, XcodeGen, pure Xcode)
+- xcconfig hierarchy and build settings
+- Build phase scripts and automation
+- Makefile patterns for Xcode projects
+- Swift type design, protocols, error handling for app code
+- UIViewRepresentable bridging patterns
 
 ### ❌ Exclude These Topics:
-- Swift concurrency deep dives
+- Swift concurrency deep dives (separate skill exists)
 - Tool usage instructions
-- Build system configuration
-- SwiftUI (except bridging)
+- Server-side Swift / Linux Swift
+- SwiftUI deep dives (separate skill exists; bridging patterns are in scope)
 
 ## Updating the Skill
 
 When adding new content:
-1. Ask: "Is this UIKit-specific?"
+1. Ask: "Is this relevant to Apple app development?"
 2. Ask: "Is this a fact or an opinion?"
 3. Ask: "Can agents actually use this?"
 4. Ask: "Is this about correctness or style?"
+5. Ask: "Which section of the Topic Router does this belong to?"
 
 If unsure, err on the side of excluding content.
 
 ## Summary
 
-**Focus**: UIKit APIs, patterns, and correctness
-**Avoid**: Architecture, tools, Swift language features
+**Focus**: UIKit/UI patterns, Xcode project setup, Swift app conventions
+**Avoid**: Architecture enforcement, tools, server-side Swift
 **Tone**: Factual, helpful, non-prescriptive
-**Goal**: Make agents UIKit experts without enforcing opinions
+**Goal**: Make agents effective Apple app developers without enforcing opinions
