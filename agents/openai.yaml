@@ -1,17 +1,21 @@
-name: uikit-expert
-version: "0.1.0"
+name: apple-dev
+version: "0.5.0"
 description: >-
-  Expert UIKit guidance for view lifecycle, Auto Layout, table/collection views,
-  navigation, animation, and modern UIKit patterns.
+  Apple platform development: UIKit patterns, Xcode/Tuist project setup,
+  xcconfig, build phases, Makefile, and Swift coding conventions for app
+  development.
 author:
   name: ohlulu
-repository: https://github.com/ohlulu/UIKit-Expert-Skill
+repository: https://github.com/ohlulu/Apple-Dev-Skill
 license: MIT
 keywords:
   - swift
   - uikit
   - ios
   - apple
+  - xcode
+  - tuist
+  - xcconfig
   - auto-layout
   - table-view
   - collection-view
@@ -19,5 +23,7 @@ keywords:
   - animation
   - diffable-datasource
   - compositional-layout
+  - build-phases
+  - makefile
 skills:
-  - uikit-expert-skill
+  - apple-dev-skill
